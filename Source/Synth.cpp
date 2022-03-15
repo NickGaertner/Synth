@@ -14,7 +14,9 @@ namespace Synth {
 
 	void SynthVoice::prepare(const juce::dsp::ProcessSpec& spec)
 	{
-		tmpAudioBlock = juce::dsp::AudioBlock<float>(heapBlock, spec.numChannels + modulationProcessors.size(), spec.maximumBlockSize);
+		tmpAudioBlock = juce::dsp::AudioBlock<float>(heapBlock, 
+			spec.numChannels + modulationProcessors.size() + customDsp::WORK_BUFFERS + 1, // + 1 for empty channel
+			spec.maximumBlockSize);
 		processorChain.prepare(spec);
 		modulationProcessors.prepare(spec);
 	}
@@ -26,7 +28,7 @@ namespace Synth {
 
 	void SynthVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* t_sound, int currentPitchWheelPosition)
 	{
-		juce::ignoreUnused(currentPitchWheelPosition);
+		juce::ignoreUnused(t_sound, currentPitchWheelPosition);
 
 		// OSC
 		auto osc = dynamic_cast<customDsp::InterpolationOsc*>(processorChain.getProcessor(0));
@@ -80,20 +82,26 @@ namespace Synth {
 			.getSubBlock(0, numSamples);
 		outputBlock.clear();
 
-		auto inputBlock = tmpAudioBlock.getSubsetChannelBlock(outputBuffer.getNumChannels(), modulationProcessors.size())
+		auto workBlock = tmpAudioBlock.getSubsetChannelBlock(outputBuffer.getNumChannels(), customDsp::WORK_BUFFERS)
+			.getSubBlock(0, numSamples);
+		workBlock.clear();
+
+		auto inputBlock = tmpAudioBlock.getSubsetChannelBlock(outputBuffer.getNumChannels() + customDsp::WORK_BUFFERS,
+			modulationProcessors.size() + 1)
 			.getSubBlock(0, numSamples);;
 		inputBlock.clear();
 
 		// fill inputBlock with modulation signals
 		juce::dsp::ProcessContextNonReplacing<float> modulationContext{ juce::dsp::AudioBlock<float>{},inputBlock };
-		modulationProcessors.process(modulationContext);
+		modulationProcessors.process(modulationContext, workBlock);
 
 		// process with processChain on temporary blocks
 		juce::dsp::ProcessContextNonReplacing<float> processContext{ inputBlock, outputBlock };
-		processorChain.process(processContext);
+		processorChain.process(processContext, workBlock);
 
 		// add result from temporary block to the output buffer
-		juce::dsp::AudioBlock<float>{outputBuffer}.getSubBlock((size_t)startSample, (size_t)numSamples).add(outputBlock);
+		juce::dsp::AudioBlock<float>{outputBuffer}.getSubBlock((size_t)startSample, (size_t)numSamples)
+			.add(outputBlock.getSubsetChannelBlock(0, outputBuffer.getNumChannels()));
 	}
 
 	//

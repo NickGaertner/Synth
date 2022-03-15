@@ -220,6 +220,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SynthAudioProcessor::createP
 	{
 		auto prefix = "OSC_" + std::to_string(synthPos) + "::";
 		processorData[synthPos].add(new customDsp::InterpolationOsc::SharedData{ prefix });
+		processorData[synthPos].add(new customDsp::Gain::SharedData{ prefix });
 
 	}
 

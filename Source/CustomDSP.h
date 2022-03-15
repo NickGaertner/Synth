@@ -3,51 +3,51 @@
 #include "JuceHeader.h"
 
 namespace customDsp {
+	// number of channels to append to the outputBlock which can be freely used by processors to store
+	// temporary data
+	const int WORK_BUFFERS = 2;
+
 
 	struct ModulationParam {
 		enum class Channel {
 			ENV_0,
 			ENV_1,
-			LFO_0,
-			LFO_1,
+			//LFO_0,
+			//LFO_1,
 			NONE
 		};
 
 		float modifier = 0.f;
 		Channel src_channel = Channel::NONE;
-		std::function<float(float, float)> modulation; // only updated if isActive()
 
 		bool isActive() {
 			return src_channel != Channel::NONE;
 		}
 
 		bool isLfo() {
-			return isActive() && src_channel >= Channel::LFO_0;
+			return false;// isActive() && src_channel >= Channel::LFO_0;
 		}
 
 		bool isEnv() {
 			return src_channel <= Channel::ENV_1;
 		};
 
-		static void addModParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& name) {
+		static void addModParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& name, float modRange = 1.f) {
 			layout.add(std::make_unique<juce::AudioParameterChoice>(
 				name + "::MOD_CHANNEL",
 				name + "::MOD_CHANNEL",
 				juce::StringArray{ "Env0", "Env1", "Lfo0", "Lfo1", "None" },
-				Channel::NONE));
+				(int)Channel::NONE));
 			layout.add(std::make_unique<juce::AudioParameterFloat>(
 				name + "::MOD_MODIFIER",
 				name + "::MOD_MODIFIER",
-				juce::NormalisableRange<float>(-1.f, 1.0f, 0.025f, 1.f),
+				juce::NormalisableRange<float>(-1.f * modRange, 1.0f * modRange, 0.01f, 1.f),
 				0.f));
 		}
 
 		void updateModParams(const juce::AudioProcessorValueTreeState& apvts, const juce::String& name) {
 			modifier = apvts.getRawParameterValue(name + "::MOD_MODIFIER")->load();
 			src_channel = static_cast<Channel>(apvts.getRawParameterValue(name + "::MOD_CHANNEL")->load());
-			if (isActive()) {
-				modulation = [&](float x, float modValue) { return x + modifier * modValue; };
-			}
 		}
 
 	};
@@ -77,7 +77,7 @@ namespace customDsp {
 
 		virtual void reset() = 0;
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>&) = 0;
+		virtual void process(juce::dsp::ProcessContextNonReplacing<float>&, juce::dsp::AudioBlock<float>&) = 0;
 
 		virtual void noteOn() {};
 
@@ -98,8 +98,8 @@ namespace customDsp {
 			std::for_each(processors.begin(), processors.end(), [&](Processor* p) {p->reset(); });
 		};
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context) override {
-			std::for_each(processors.begin(), processors.end(), [&](Processor* p) {p->process(context); });
+		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
+			std::for_each(processors.begin(), processors.end(), [&](Processor* p) {p->process(context, workBuffers); });
 		};
 
 		virtual void noteOn() override {
@@ -134,12 +134,12 @@ namespace customDsp {
 	class SplitProcessor : public ProcessorChain {
 	public:
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context) override {
-			jassert(processors.size() <= context.getOutputBlock().getNumChannels());
+		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
+			jassert(processors.size() < context.getOutputBlock().getNumChannels());
 			for (size_t i = 0; i < processors.size(); i++) {
 				auto singleOutputChannel = context.getOutputBlock().getSingleChannelBlock(i);
 				juce::dsp::ProcessContextNonReplacing<float> tmp_context{ context.getInputBlock(), singleOutputChannel };
-				processors[i]->process(tmp_context);
+				processors[i]->process(tmp_context, workBuffers);
 			}
 		};
 
@@ -156,10 +156,11 @@ namespace customDsp {
 
 			float wtPos, pitch;
 			std::function<float(float)> wf0, wf1;
-			ModulationParam modParams[2];
+			ModulationParam modParams[3];
 			enum {
 				ENV,
 				WT_POS,
+				PITCH,
 			};
 
 			virtual InterpolationOsc* createProcessor() override {
@@ -174,6 +175,7 @@ namespace customDsp {
 				modParams[WT_POS].updateModParams(apvts, prefix + "WT_POS");
 
 				pitch = apvts.getRawParameterValue(prefix + "PITCH")->load();
+				modParams[PITCH].updateModParams(apvts, prefix + "PITCH");
 
 				wf0 = waveFormFunctions[static_cast<Waveform>(apvts.getRawParameterValue(prefix + "WF_0")->load())];
 				wf1 = waveFormFunctions[static_cast<Waveform>(apvts.getRawParameterValue(prefix + "WF_1")->load())];
@@ -181,7 +183,7 @@ namespace customDsp {
 			}
 
 			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
-				
+
 				ModulationParam::addModParams(layout, prefix + "ENV");
 
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
@@ -196,6 +198,7 @@ namespace customDsp {
 					prefix + "PITCH",
 					juce::NormalisableRange<float>(-24.0f, 24.0f, 0.01f, 1.f),
 					0.f));
+				ModulationParam::addModParams(layout, prefix + "PITCH", 24.f);
 
 				layout.add(std::make_unique<juce::AudioParameterChoice>(
 					prefix + "WF_0",
@@ -207,7 +210,6 @@ namespace customDsp {
 					prefix + "WF_1",
 					waveFormStrings,
 					0));
-
 			}
 
 			enum Waveform {
@@ -261,7 +263,7 @@ namespace customDsp {
 			phase.reset();
 		}
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context) override {
+		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
 			auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
 			auto& outputBlock = context.getOutputBlock();
 
@@ -271,27 +273,18 @@ namespace customDsp {
 
 			// prepare for modulation
 
-			// pitch
-			auto phaseStep = (juce::MathConstants<float>::twoPi * (frequency * std::powf(2.f, data->pitch / 12.f))) / data->sampleRate;
+			//pitch 
+			auto basePitch = data->pitch;
+			auto pitchMod = data->modParams[SharedData::PITCH].modifier;
+			auto pitchModSrc = inputBlock.getChannelPointer((size_t)data->modParams[SharedData::PITCH].src_channel);
 
 			// wtPosition and waveform in general
-			std::function<float(float, float)> wf;
-
-			if (data->modParams[SharedData::WT_POS].isActive()) {
-				auto modChannel = data->modParams[SharedData::WT_POS].src_channel;
-				auto& modulate = data->modParams[SharedData::WT_POS].modulation;
-				wf = [&](float phase, size_t sample) {
-					auto modWtPos = modulate(data->wtPos, inputBlock.getSample((int)modChannel, sample));
-					return ((1.f - modWtPos) * data->wf0(phase) + modWtPos * data->wf1(phase)) * 0.0625; };
-			}
-			else {
-				wf = [&](float phase, size_t sample) {
-					return ((1.f - data->wtPos) * data->wf0(phase) + data->wtPos * data->wf1(phase)) * 0.0625; };
-			}
-
+			auto baseWtPos = data->wtPos;
+			auto wtPosMod = data->modParams[SharedData::WT_POS].modifier;
+			auto wtPosModSrc = inputBlock.getChannelPointer((size_t)data->modParams[SharedData::WT_POS].src_channel);
 
 			// envelope
-			std::function<float(size_t)> env;
+			std::function<float(size_t)> env; // TODO refactor with if
 			auto envChannel = getEnvChannel();
 
 			if (envChannel == -1) { // no envelope connected
@@ -301,19 +294,23 @@ namespace customDsp {
 				env = [&](size_t sample) { return inputBlock.getSample(envChannel, sample); };
 			}
 
-			auto tmp_phase = phase;
+			// calculate wave only once on a work buffer and then add it to all actual output buffers
+			jassert(WORK_BUFFERS >= 1);
+			jassert(outputBlock.getNumSamples() == workBuffers.getNumSamples());
+			auto tmpPtr = workBuffers.getChannelPointer(0);
 
-			for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
-				tmp_phase = phase;
-				auto channelPtr = outputBlock.getChannelPointer(channel);
-
-				for (size_t i = 0; i < outputBlock.getNumSamples(); i++) {
-					channelPtr[i] += wf(tmp_phase.advance(phaseStep), i) * velocity * env(i);
-				}
-
+			for (size_t i = 0; i < workBuffers.getNumSamples(); i++) {
+				auto pitch = basePitch + pitchMod * pitchModSrc[i];
+				auto phaseStep = (juce::MathConstants<float>::twoPi * (frequency * std::powf(2.f, pitch / 12.f))) / data->sampleRate;
+				auto wtPos = baseWtPos + wtPosMod * wtPosModSrc[i];
+				auto x = phase.advance(phaseStep);
+				// important to replace instead of add here
+				tmpPtr[i] = ((1.f - wtPos) * data->wf0(x) + wtPos * data->wf1(x)) * 0.125 * velocity * env(i);
 			}
 
-			phase = tmp_phase;
+			for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
+				outputBlock.getSingleChannelBlock(channel).add(workBuffers.getSingleChannelBlock(0));
+			}
 		};
 
 		int getEnvChannel() {
@@ -338,6 +335,74 @@ namespace customDsp {
 		juce::dsp::Phase<float> phase;
 
 		JUCE_LEAK_DETECTOR(InterpolationOsc);
+	};
+
+
+	class Gain : public Processor {
+	public:
+
+		struct SharedData : public Processor::SharedData {
+			using Processor::SharedData::SharedData;
+
+			float gain = 1.f;
+			ModulationParam modParams[1];
+			enum {
+				GAIN
+			};
+
+			virtual Gain* createProcessor() override {
+				return new Gain(this);
+			};
+
+			virtual void updateParams(const juce::AudioProcessorValueTreeState& apvts) override {
+				gain = apvts.getRawParameterValue(prefix + "GAIN")->load();
+				modParams[GAIN].updateModParams(apvts, prefix + "GAIN");
+			}
+
+			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
+				layout.add(std::make_unique<juce::AudioParameterFloat>(
+					prefix + "GAIN",
+					prefix + "GAIN",
+					juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f, 1.f),
+					1.f));
+				ModulationParam::addModParams(layout, prefix + "GAIN");
+			}
+
+		private:
+			JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SharedData)
+		};
+
+		Gain() = delete;
+
+		Gain(SharedData* t_data) : data(t_data) {};
+
+
+		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
+			data->sampleRate = spec.sampleRate;
+		};
+
+		virtual void reset() override {
+		}
+
+		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
+			auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
+			auto& outputBlock = context.getOutputBlock();
+
+			auto workChannel = workBuffers.getSingleChannelBlock(0);
+			workChannel.replaceWithProductOf(
+				inputBlock.getSingleChannelBlock((int)data->modParams[SharedData::GAIN].src_channel), data->modParams[SharedData::GAIN].modifier);
+			workChannel.add(data->gain);
+
+
+			for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
+				outputBlock.getSingleChannelBlock(channel).multiplyBy(workChannel);
+			}
+		};
+
+	private:
+		SharedData* data;
+
+		JUCE_LEAK_DETECTOR(Gain);
 	};
 
 
@@ -414,7 +479,7 @@ namespace customDsp {
 			samplesUntilTransition = -1;
 		}
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context) override {
+		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
 			if (stage == Stage::IDLE) {
 				return;
 			}

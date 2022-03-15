@@ -58,7 +58,7 @@ private:
 	void initSynths();
 
 	static const int POLYPHONY = 16; // 16
-	static const int OSC_NUMBER = 2; // 2
+	static const int OSC_NUMBER = 1; // 2
 	static const int ENV_NUMBER = 2; // 2
 	static const int LFO_NUMBER = 0; // 2
 	Synth::Synth synths[OSC_NUMBER];
