@@ -10,6 +10,8 @@
 
 #include <JuceHeader.h>
 #include "Synth.h"
+#include "Configuration.h"
+
 //==============================================================================
 /**
 */
@@ -53,20 +55,20 @@ public:
 	void getStateInformation(juce::MemoryBlock& destData) override;
 	void setStateInformation(const void* data, int sizeInBytes) override;
 
+	juce::AudioProcessorValueTreeState& getApvts() {
+		return apvts;
+	}
+
 private:
 
 	void initSynths();
 
-	static const int POLYPHONY = 16; // 16
-	static const int OSC_NUMBER = 1; // 2
-	static const int ENV_NUMBER = 2; // 2
-	static const int LFO_NUMBER = 0; // 2
-	Synth::Synth synths[OSC_NUMBER];
+	std::vector<Synth::Synth> synths{configuration::OSC_NUMBER};
 
 	// first OSC_NUMBER entries hold synth specific data (e.g. osc settings), 
 	// the second to last entry holds synth independent data (e.g. fx)
 	// and the last entry holds modulation parameters (envs and lfos)
-	juce::OwnedArray<customDsp::Processor::SharedData> processorData[OSC_NUMBER + 2];
+	std::vector<juce::OwnedArray<customDsp::Processor::SharedData>> processorData{configuration::OSC_NUMBER+2};
 
 	juce::AudioProcessorValueTreeState::ParameterLayout createParameterDataAndLayout();
 	void updateSettings();

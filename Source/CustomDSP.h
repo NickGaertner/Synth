@@ -1,53 +1,48 @@
 #pragma once
 
 #include "JuceHeader.h"
+#include "Configuration.h"
 
 namespace customDsp {
+
 	// number of channels to append to the outputBlock which can be freely used by processors to store
 	// temporary data
-	const int WORK_BUFFERS = 2;
+	constexpr int WORK_BUFFERS = 2;
 
 
 	struct ModulationParam {
-		enum class Channel {
-			ENV_0,
-			ENV_1,
-			//LFO_0,
-			//LFO_1,
-			NONE
-		};
 
-		float modifier = 0.f;
-		Channel src_channel = Channel::NONE;
+		float factor = 0.f;
+		int src_channel = configuration::EMPTY_MOD_CHANNEL;
 
 		bool isActive() {
-			return src_channel != Channel::NONE;
+			return src_channel != configuration::EMPTY_MOD_CHANNEL;
 		}
 
 		bool isLfo() {
-			return false;// isActive() && src_channel >= Channel::LFO_0;
+			return isActive() && src_channel >= configuration::ENV_NUMBER;
 		}
 
 		bool isEnv() {
-			return src_channel <= Channel::ENV_1;
+			return src_channel < configuration::ENV_NUMBER;
 		};
 
 		static void addModParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& name, float modRange = 1.f) {
 			layout.add(std::make_unique<juce::AudioParameterChoice>(
-				name + "::MOD_CHANNEL",
-				name + "::MOD_CHANNEL",
-				juce::StringArray{ "Env0", "Env1", "Lfo0", "Lfo1", "None" },
-				(int)Channel::NONE));
+				name + configuration::MOD_CHANNEL_SUFFIX,
+				name + configuration::MOD_CHANNEL_SUFFIX,
+				configuration::getModChannelNames(),
+				configuration::EMPTY_MOD_CHANNEL));
 			layout.add(std::make_unique<juce::AudioParameterFloat>(
-				name + "::MOD_MODIFIER",
-				name + "::MOD_MODIFIER",
+				name + configuration::MOD_FACTOR_SUFFIX,
+				name + configuration::MOD_FACTOR_SUFFIX,
 				juce::NormalisableRange<float>(-1.f * modRange, 1.0f * modRange, 0.01f, 1.f),
 				0.f));
 		}
 
 		void updateModParams(const juce::AudioProcessorValueTreeState& apvts, const juce::String& name) {
-			modifier = apvts.getRawParameterValue(name + "::MOD_MODIFIER")->load();
-			src_channel = static_cast<Channel>(apvts.getRawParameterValue(name + "::MOD_CHANNEL")->load());
+			factor = apvts.getRawParameterValue(name + configuration::MOD_FACTOR_SUFFIX)->load();
+			src_channel = apvts.getRawParameterValue(name + configuration::MOD_CHANNEL_SUFFIX)->load();
 		}
 
 	};
@@ -85,6 +80,50 @@ namespace customDsp {
 
 	private:
 		JUCE_LEAK_DETECTOR(Processor)
+	};
+
+	class DummyProcessor : public Processor {
+	public:
+
+		struct SharedData : public Processor::SharedData {
+			using Processor::SharedData::SharedData;
+
+			virtual DummyProcessor* createProcessor() override {
+				return new DummyProcessor(this);
+			};
+
+			virtual void updateParams(const juce::AudioProcessorValueTreeState& apvts) override {
+
+			}
+
+			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
+
+			}
+
+		private:
+			JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SharedData)
+		};
+
+		DummyProcessor() = delete;
+
+		DummyProcessor(SharedData* t_data) : data(t_data) {};
+
+
+		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
+			data->sampleRate = spec.sampleRate;
+		};
+
+		virtual void reset() override {
+		}
+
+		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
+
+		};
+
+	private:
+		SharedData* data;
+
+		JUCE_LEAK_DETECTOR(DummyProcessor);
 	};
 
 
@@ -154,6 +193,7 @@ namespace customDsp {
 		struct SharedData : public Processor::SharedData {
 			using Processor::SharedData::SharedData;
 
+			bool bypassed;
 			float wtPos, pitch;
 			std::function<float(float)> wf0, wf1;
 			ModulationParam modParams[3];
@@ -168,15 +208,17 @@ namespace customDsp {
 			};
 
 			virtual void updateParams(const juce::AudioProcessorValueTreeState& apvts) override {
+				bypassed = apvts.getRawParameterValue(prefix + configuration::BYPASSED_SUFFIX)->load();
 
-				modParams[ENV].updateModParams(apvts, prefix + "ENV");
+				modParams[ENV].updateModParams(apvts, prefix + configuration::ENV_SUFFIX);
 
-				wtPos = apvts.getRawParameterValue(prefix + "WT_POS")->load();
-				modParams[WT_POS].updateModParams(apvts, prefix + "WT_POS");
+				wtPos = apvts.getRawParameterValue(prefix + configuration::WT_POS_SUFFIX)->load();
+				modParams[WT_POS].updateModParams(apvts, prefix + configuration::WT_POS_SUFFIX);
 
-				pitch = apvts.getRawParameterValue(prefix + "PITCH")->load();
-				modParams[PITCH].updateModParams(apvts, prefix + "PITCH");
+				pitch = apvts.getRawParameterValue(prefix + configuration::PITCH_SUFFIX)->load();
+				modParams[PITCH].updateModParams(apvts, prefix + configuration::PITCH_SUFFIX);
 
+				// will be changed later for (sample based) wavetables
 				wf0 = waveFormFunctions[static_cast<Waveform>(apvts.getRawParameterValue(prefix + "WF_0")->load())];
 				wf1 = waveFormFunctions[static_cast<Waveform>(apvts.getRawParameterValue(prefix + "WF_1")->load())];
 
@@ -184,21 +226,26 @@ namespace customDsp {
 
 			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
 
-				ModulationParam::addModParams(layout, prefix + "ENV");
+				layout.add(std::make_unique<juce::AudioParameterBool>(
+					prefix + configuration::BYPASSED_SUFFIX,
+					prefix + configuration::BYPASSED_SUFFIX,
+					false));
+
+				ModulationParam::addModParams(layout, prefix + configuration::ENV_SUFFIX);
 
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + "WT_POS",
-					prefix + "WT_POS",
+					prefix + configuration::WT_POS_SUFFIX,
+					prefix + configuration::WT_POS_SUFFIX,
 					juce::NormalisableRange<float>(0.0f, 1.0f, 0.025f, 1.f),
 					0.f));
-				ModulationParam::addModParams(layout, prefix + "WT_POS");
+				ModulationParam::addModParams(layout, prefix + configuration::WT_POS_SUFFIX);
 
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + "PITCH",
-					prefix + "PITCH",
+					prefix + configuration::PITCH_SUFFIX,
+					prefix + configuration::PITCH_SUFFIX,
 					juce::NormalisableRange<float>(-24.0f, 24.0f, 0.01f, 1.f),
 					0.f));
-				ModulationParam::addModParams(layout, prefix + "PITCH", 24.f);
+				ModulationParam::addModParams(layout, prefix + configuration::PITCH_SUFFIX, 24.f);
 
 				layout.add(std::make_unique<juce::AudioParameterChoice>(
 					prefix + "WF_0",
@@ -209,7 +256,7 @@ namespace customDsp {
 					prefix + "WF_1",
 					prefix + "WF_1",
 					waveFormStrings,
-					0));
+					3));
 			}
 
 			enum Waveform {
@@ -264,23 +311,27 @@ namespace customDsp {
 		}
 
 		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
-			auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
-			auto& outputBlock = context.getOutputBlock();
-
+			if (data->bypassed) {
+				return;
+			}
+			
 			if (context.isBypassed) {
 				jassertfalse; // normally shouldn't land here
 			}
+
+			auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
+			auto& outputBlock = context.getOutputBlock();
 
 			// prepare for modulation
 
 			//pitch 
 			auto basePitch = data->pitch;
-			auto pitchMod = data->modParams[SharedData::PITCH].modifier;
+			auto pitchMod = data->modParams[SharedData::PITCH].factor;
 			auto pitchModSrc = inputBlock.getChannelPointer((size_t)data->modParams[SharedData::PITCH].src_channel);
 
 			// wtPosition and waveform in general
 			auto baseWtPos = data->wtPos;
-			auto wtPosMod = data->modParams[SharedData::WT_POS].modifier;
+			auto wtPosMod = data->modParams[SharedData::WT_POS].factor;
 			auto wtPosModSrc = inputBlock.getChannelPointer((size_t)data->modParams[SharedData::WT_POS].src_channel);
 
 			// envelope
@@ -355,17 +406,17 @@ namespace customDsp {
 			};
 
 			virtual void updateParams(const juce::AudioProcessorValueTreeState& apvts) override {
-				gain = apvts.getRawParameterValue(prefix + "GAIN")->load();
-				modParams[GAIN].updateModParams(apvts, prefix + "GAIN");
+				gain = apvts.getRawParameterValue(prefix + configuration::GAIN_SUFFIX)->load();
+				modParams[GAIN].updateModParams(apvts, prefix + configuration::GAIN_SUFFIX);
 			}
 
 			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + "GAIN",
-					prefix + "GAIN",
+					prefix + configuration::GAIN_SUFFIX,
+					prefix + configuration::GAIN_SUFFIX,
 					juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f, 1.f),
 					1.f));
-				ModulationParam::addModParams(layout, prefix + "GAIN");
+				ModulationParam::addModParams(layout, prefix + configuration::GAIN_SUFFIX);
 			}
 
 		private:
@@ -390,7 +441,7 @@ namespace customDsp {
 
 			auto workChannel = workBuffers.getSingleChannelBlock(0);
 			workChannel.replaceWithProductOf(
-				inputBlock.getSingleChannelBlock((int)data->modParams[SharedData::GAIN].src_channel), data->modParams[SharedData::GAIN].modifier);
+				inputBlock.getSingleChannelBlock((int)data->modParams[SharedData::GAIN].src_channel), data->modParams[SharedData::GAIN].factor);
 			workChannel.add(data->gain);
 
 
@@ -430,31 +481,31 @@ namespace customDsp {
 			};
 
 			virtual void updateParams(const juce::AudioProcessorValueTreeState& apvts) override {
-				stageValues[(int)Stage::ATTACK] = apvts.getRawParameterValue(prefix + "ATTACK")->load();
-				stageValues[(int)Stage::DECAY] = apvts.getRawParameterValue(prefix + "DECAY")->load();
-				stageValues[(int)Stage::SUSTAIN] = apvts.getRawParameterValue(prefix + "SUSTAIN")->load();
-				stageValues[(int)Stage::RELEASE] = apvts.getRawParameterValue(prefix + "RELEASE")->load();
+				stageValues[(int)Stage::ATTACK] = apvts.getRawParameterValue(prefix + configuration::ATTACK_SUFFIX)->load();
+				stageValues[(int)Stage::DECAY] = apvts.getRawParameterValue(prefix + configuration::DECAY_SUFFIX)->load();
+				stageValues[(int)Stage::SUSTAIN] = apvts.getRawParameterValue(prefix + configuration::SUSTAIN_SUFFIX)->load();
+				stageValues[(int)Stage::RELEASE] = apvts.getRawParameterValue(prefix + configuration::RELEASE_SUFFIX)->load();
 			}
 
 			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + "ATTACK",
-					prefix + "ATTACK",
+					prefix + configuration::ATTACK_SUFFIX,
+					prefix + configuration::ATTACK_SUFFIX,
 					juce::NormalisableRange<float>(0.0f, 10.0f, 0.025f, 0.5f),
 					0.5f));
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + "DECAY",
-					prefix + "DECAY",
+					prefix + configuration::DECAY_SUFFIX,
+					prefix + configuration::DECAY_SUFFIX,
 					juce::NormalisableRange<float>(0.0f, 10.0f, 0.025f, 0.5f),
 					0.2f));
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + "SUSTAIN",
-					prefix + "SUSTAIN",
+					prefix + configuration::SUSTAIN_SUFFIX,
+					prefix + configuration::SUSTAIN_SUFFIX,
 					juce::NormalisableRange<float>(minLevel, 1.0f, 0.025f, 0.5f),
 					0.8f));
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + "RELEASE",
-					prefix + "RELEASE",
+					prefix + configuration::RELEASE_SUFFIX,
+					prefix + configuration::RELEASE_SUFFIX,
 					juce::NormalisableRange<float>(0.0f, 10.0f, 0.025f, 0.5f),
 					0.4f));
 			}

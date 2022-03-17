@@ -10,6 +10,7 @@
 
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
+#include "GUI.h"
 
 //==============================================================================
 /**
@@ -25,9 +26,11 @@ public:
     void resized() override;
 
 private:
-    // This reference is provided as a quick way for your editor to
-    // access the processor object that created it.
+    customGui::CustomLookAndFeel lookAndFeel;
+
     SynthAudioProcessor& audioProcessor;
+
+    customGui::SynthComponent synthComponent;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SynthAudioProcessorEditor)
 };

@@ -158,8 +158,8 @@ bool SynthAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* SynthAudioProcessor::createEditor()
 {
-	//return new SynthAudioProcessorEditor (*this);
-	return new juce::GenericAudioProcessorEditor(*this);
+	return new SynthAudioProcessorEditor (*this);
+	//return new juce::GenericAudioProcessorEditor(*this);
 }
 
 //==============================================================================
@@ -183,7 +183,7 @@ void SynthAudioProcessor::initSynths()
 	{
 		auto& synth = synths[synthPos];
 
-		for (auto i = 0; i < POLYPHONY; i++) {
+		for (auto i = 0; i < configuration::POLYPHONY; i++) {
 			// add processors to each voice's processorChain and modulationProcessors
 			auto voice = new Synth::SynthVoice{};
 
@@ -194,13 +194,13 @@ void SynthAudioProcessor::initSynths()
 				});
 
 			// synth independent
-			std::for_each(processorData[OSC_NUMBER].begin(), processorData[OSC_NUMBER].end(),
+			std::for_each(processorData[configuration::OSC_NUMBER].begin(), processorData[configuration::OSC_NUMBER].end(),
 				[&](customDsp::Processor::SharedData* data) {
 					voice->processorChain.addProcessor(data->createProcessor());
 				});
 
 			// modulation
-			std::for_each(processorData[OSC_NUMBER + 1].begin(), processorData[OSC_NUMBER + 1].end(),
+			std::for_each(processorData[configuration::OSC_NUMBER + 1].begin(), processorData[configuration::OSC_NUMBER + 1].end(),
 				[&](customDsp::Processor::SharedData* data) {
 					voice->modulationProcessors.addProcessor(data->createProcessor());
 				});
@@ -216,27 +216,39 @@ juce::AudioProcessorValueTreeState::ParameterLayout SynthAudioProcessor::createP
 	// DATA
 
 	// Create Processor::SharedData for the synth specific processors in the right order
-	for (auto synthPos = 0; synthPos < OSC_NUMBER; synthPos++)
+	for (auto synthPos = 0; synthPos < configuration::OSC_NUMBER; synthPos++)
 	{
-		auto prefix = "OSC_" + std::to_string(synthPos) + "::";
+		auto prefix = configuration::OSC_PREFIX + std::to_string(synthPos);
 		processorData[synthPos].add(new customDsp::InterpolationOsc::SharedData{ prefix });
 		processorData[synthPos].add(new customDsp::Gain::SharedData{ prefix });
 
 	}
 
 	// Create Processor::SharedData for the synth independent processors in the right order
+	for (auto i = 0; i < configuration::FILTER_NUMBER; i++) {
+		auto prefix = configuration::FILTER_PREFIX + std::to_string(i);
+		processorData[configuration::OSC_NUMBER].add(new customDsp::DummyProcessor::SharedData{ prefix });
+	}
 
+	for (auto i = 0; i < configuration::FX_NUMBER; i++) {
+		auto prefix = configuration::FX_PREFIX + std::to_string(i);
+		processorData[configuration::OSC_NUMBER].add(new customDsp::DummyProcessor::SharedData{ prefix });
+	}
+
+	processorData[configuration::OSC_NUMBER].add(new customDsp::DummyProcessor::SharedData{configuration::PAN_PREFIX});
 
 	// Create Processor::SharedData for the modulation processors in the right order
-	for (auto i = 0; i < ENV_NUMBER; i++) {
-		auto prefix = "ENV_" + std::to_string(i) + "::";
-		processorData[OSC_NUMBER + 1].add(new customDsp::Envelope::SharedData{ prefix });
+	for (auto i = 0; i < configuration::ENV_NUMBER; i++) {
+		auto prefix = configuration::ENV_PREFIX + std::to_string(i);
+		processorData[configuration::OSC_NUMBER + 1].add(new customDsp::Envelope::SharedData{ prefix });
 	}
 
-	for (auto i = 0; i < LFO_NUMBER; i++) {
-		auto prefix = "LFO_" + std::to_string(i) + "::";
-		processorData[OSC_NUMBER + 1].add(new customDsp::InterpolationOsc::SharedData{ prefix });
+	for (auto i = 0; i < configuration::LFO_NUMBER; i++) {
+		auto prefix = configuration::LFO_PREFIX + std::to_string(i);
+		processorData[configuration::OSC_NUMBER + 1].add(new customDsp::DummyProcessor::SharedData{ prefix });
 	}
+
+	// TODO Master? (it's independant of the synths)
 
 	// LAYOUT
 

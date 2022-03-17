@@ -1,7 +1,7 @@
 /*
   ==============================================================================
 
-    This file contains the basic framework code for a JUCE plugin editor.
+	This file contains the basic framework code for a JUCE plugin editor.
 
   ==============================================================================
 */
@@ -10,31 +10,30 @@
 #include "PluginEditor.h"
 
 //==============================================================================
-SynthAudioProcessorEditor::SynthAudioProcessorEditor (SynthAudioProcessor& p)
-    : AudioProcessorEditor (&p), audioProcessor (p)
+SynthAudioProcessorEditor::SynthAudioProcessorEditor(SynthAudioProcessor& p)
+	: AudioProcessorEditor(&p), audioProcessor(p), synthComponent(audioProcessor)
 {
-    // Make sure that before the constructor has finished, you've set the
-    // editor's size to whatever you need it to be.
-    setSize (400, 300);
+	setLookAndFeel(&lookAndFeel);
+
+	addAndMakeVisible(synthComponent);
+	setResizeLimits(950, 650, 1920, 1080);
+	//setSize(950, 650);
+	setResizable(true, false);
 }
 
 SynthAudioProcessorEditor::~SynthAudioProcessorEditor()
 {
+	setLookAndFeel(nullptr);
 }
 
 //==============================================================================
-void SynthAudioProcessorEditor::paint (juce::Graphics& g)
+void SynthAudioProcessorEditor::paint(juce::Graphics& g)
 {
-    // (Our component is opaque, so we must completely fill the background with a solid colour)
-    g.fillAll (getLookAndFeel().findColour (juce::ResizableWindow::backgroundColourId));
 
-    g.setColour (juce::Colours::white);
-    g.setFont (15.0f);
-    g.drawFittedText ("Hello World!", getLocalBounds(), juce::Justification::centred, 1);
+	g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 }
 
 void SynthAudioProcessorEditor::resized()
 {
-    // This is generally where you'll want to lay out the positions of any
-    // subcomponents in your editor..
+	synthComponent.centreWithSize(getWidth(), getHeight());
 }

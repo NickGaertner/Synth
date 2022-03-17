@@ -5,8 +5,12 @@
               cppLanguageStandard="20">
   <MAINGROUP id="LnM0Ay" name="Synth">
     <GROUP id="{DFE287B5-7806-3790-B471-A2EC5EAEEBA8}" name="Source">
+      <FILE id="bP4VSH" name="Configuration.cpp" compile="1" resource="0"
+            file="Source/Configuration.cpp"/>
+      <FILE id="umS1BO" name="Configuration.h" compile="0" resource="0" file="Source/Configuration.h"/>
       <FILE id="mMKJXH" name="CustomDSP.h" compile="0" resource="0" file="Source/CustomDSP.h"/>
-      <FILE id="KBsPRK" name="Global.h" compile="0" resource="0" file="Source/Global.h"/>
+      <FILE id="vvaxEe" name="GUI.cpp" compile="1" resource="0" file="Source/GUI.cpp"/>
+      <FILE id="HNAP7f" name="GUI.h" compile="0" resource="0" file="Source/GUI.h"/>
       <FILE id="raFqtF" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
       <FILE id="u0lvsP" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>
