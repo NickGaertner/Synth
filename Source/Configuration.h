@@ -27,11 +27,14 @@ namespace configuration {
 	extern const juce::String MOD_FACTOR_SUFFIX;
 	extern const juce::String ENV_SUFFIX;
 	extern const juce::String WT_POS_SUFFIX;
+	extern const juce::String WF0_SUFFIX;
+	extern const juce::String WF1_SUFFIX;
 	extern const juce::String PITCH_SUFFIX;
 	extern const juce::String GAIN_SUFFIX;
 	extern const juce::String ATTACK_SUFFIX;
 	extern const juce::String DECAY_SUFFIX;
 	extern const juce::String SUSTAIN_SUFFIX;
 	extern const juce::String RELEASE_SUFFIX;
+	extern const juce::String RATE_SUFFIX;
 
 }

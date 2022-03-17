@@ -82,22 +82,25 @@ int SynthAudioProcessor::getCurrentProgram()
 
 void SynthAudioProcessor::setCurrentProgram(int index)
 {
+	juce::ignoreUnused(index);
 }
 
 const juce::String SynthAudioProcessor::getProgramName(int index)
 {
+	juce::ignoreUnused(index);
 	return {};
 }
 
 void SynthAudioProcessor::changeProgramName(int index, const juce::String& newName)
 {
+	juce::ignoreUnused(index, newName);
 }
 
 //==============================================================================
 void SynthAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
 
-	juce::dsp::ProcessSpec spec{ sampleRate, samplesPerBlock, getTotalNumOutputChannels() };
+	juce::dsp::ProcessSpec spec{ sampleRate, (juce::uint32)samplesPerBlock, (juce::uint32)getTotalNumOutputChannels() };
 	for (auto& synth : synths)
 	{
 		synth.prepare(spec);
@@ -168,12 +171,14 @@ void SynthAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 	// You should use this method to store your parameters in the memory block.
 	// You could do that either as raw data, or use the XML or ValueTree classes
 	// as intermediaries to make it easy to save and load complex data.
+	juce::ignoreUnused(destData);
 }
 
 void SynthAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
 	// You should use this method to restore your parameters from this memory block,
 	// whose contents will have been created by the getStateInformation() call.
+	juce::ignoreUnused(data, sizeInBytes);
 }
 
 void SynthAudioProcessor::initSynths()
@@ -245,7 +250,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SynthAudioProcessor::createP
 
 	for (auto i = 0; i < configuration::LFO_NUMBER; i++) {
 		auto prefix = configuration::LFO_PREFIX + std::to_string(i);
-		processorData[configuration::OSC_NUMBER + 1].add(new customDsp::DummyProcessor::SharedData{ prefix });
+		processorData[configuration::OSC_NUMBER + 1].add(new customDsp::LFO::SharedData{ prefix });
 	}
 
 	// TODO Master? (it's independant of the synths)

@@ -3,8 +3,8 @@
 
 customGui::SynthComponent::SynthComponent(SynthAudioProcessor& audioProcessor)
 {
-	mainGrid.columnGap = Px(1);
-	mainGrid.rowGap = Px(1);
+	mainGrid.columnGap = Px(0);
+	mainGrid.rowGap = Px(0);
 
 	mainGrid.templateRows = { Track("header-row-start", Fr(1), "header-row-end"),
 	Track("modules0-row-start", Fr(5), "modules0-row-end"),
@@ -82,12 +82,13 @@ void customGui::SynthComponent::initModules(SynthAudioProcessor& audioProcessor)
 		envModuleHolder.addModule(new EnvModule(audioProcessor, i));
 	}
 	for (auto i = 0; i < configuration::LFO_NUMBER; i++) {
-		lfoModuleHolder.addModule(new SynthModule(audioProcessor, i));
+		lfoModuleHolder.addModule(new LFOModule(audioProcessor, i));
 	}
 }
 
 customGui::SynthModule::SynthModule(SynthAudioProcessor& audioProcessor, int id)
 {
+	juce::ignoreUnused(audioProcessor, id);
 	mainGrid.autoFlow = juce::Grid::AutoFlow::row;
 	mainGrid.autoRows = Track(Fr(5));
 	mainGrid.autoColumns = Track(Fr(1));
@@ -119,7 +120,7 @@ void customGui::SynthModule::resized()
 customGui::OscModule::OscModule(SynthAudioProcessor& audioProcessor, int id) :
 	SynthModule(audioProcessor, id)
 {
-	juce::String prefix{ configuration::OSC_PREFIX + juce::String(id)};
+	juce::String prefix{ configuration::OSC_PREFIX + juce::String(id) };
 
 	// LAYOUT
 	powerAndName.nameLabel.setText(juce::String(prefix), juce::NotificationType::dontSendNotification);
@@ -159,14 +160,14 @@ customGui::OscModule::OscModule(SynthAudioProcessor& audioProcessor, int id) :
 
 	buttonAttachments.add(new ButtonAttachment(apvts, prefix + configuration::BYPASSED_SUFFIX, powerAndName.powerButton));
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + "WF_1", dropDown)); // TODO change when we have sampled wavetables
-	dropDown.addItemList({"0", "1", "2", "3"}, 1);
+	dropDown.addItemList({ "0", "1", "2", "3" }, 1);
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::WT_POS_SUFFIX, wtPosKnob.slider));
-	sliderAttachments.add(new SliderAttachment(apvts, 
-		prefix + configuration::WT_POS_SUFFIX + configuration::MOD_FACTOR_SUFFIX, 
+	sliderAttachments.add(new SliderAttachment(apvts,
+		prefix + configuration::WT_POS_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
 		wtPosModKnob.slider));
-	comboBoxAttachments.add(new ComboBoxAttachment(apvts, 
-		prefix + configuration::WT_POS_SUFFIX + configuration::MOD_CHANNEL_SUFFIX, 
+	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
+		prefix + configuration::WT_POS_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		wtPosModSrcChooser));
 	wtPosModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 
@@ -223,5 +224,38 @@ customGui::EnvModule::EnvModule(SynthAudioProcessor& audioProcessor, int id) :
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::DECAY_SUFFIX, decayKnob.slider));
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::SUSTAIN_SUFFIX, sustainKnob.slider));
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::RELEASE_SUFFIX, releaseKnob.slider));
+
+}
+
+customGui::LFOModule::LFOModule(SynthAudioProcessor& audioProcessor, int id)
+	: SynthModule(audioProcessor, id)
+{
+	juce::String prefix{ configuration::LFO_PREFIX + juce::String(id) };
+
+	// LAYOUT
+	powerAndName.powerButton.setVisible(false);
+	powerAndName.nameLabel.setText(juce::String(prefix), juce::NotificationType::dontSendNotification);
+	dropDown.setVisible(false);
+
+	mainGrid.items.addArray({
+		juce::GridItem(wf0Chooser).withArea(Property(2), Property(1), Property(4), Property(1)),
+		juce::GridItem(wtPosKnob).withArea(Property(2), Property(2)),
+		juce::GridItem(rateKnob).withArea(Property(3), Property(2)),
+		juce::GridItem(wf1Chooser).withArea(Property(2), Property(3),Property(4),Property(3)),
+		});
+
+	addAndMakeVisible(wf0Chooser);
+	addAndMakeVisible(wf1Chooser);
+	addAndMakeVisible(wtPosKnob);
+	addAndMakeVisible(rateKnob);
+
+	// VALUE TREE ATTACHMENTS
+	auto& apvts = audioProcessor.getApvts();
+
+	wf0Chooser.attachToParameter(*apvts.getParameter(prefix + configuration::WF0_SUFFIX));
+	wf1Chooser.attachToParameter(*apvts.getParameter(prefix + configuration::WF1_SUFFIX));
+
+	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::WT_POS_SUFFIX, wtPosKnob.slider));
+	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::RATE_SUFFIX, rateKnob.slider));
 	
 }

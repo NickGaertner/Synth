@@ -3,6 +3,8 @@
 #include "JuceHeader.h"
 #include "Configuration.h"
 
+// TODO rework skew values
+
 namespace customDsp {
 
 	// number of channels to append to the outputBlock which can be freely used by processors to store
@@ -42,7 +44,7 @@ namespace customDsp {
 
 		void updateModParams(const juce::AudioProcessorValueTreeState& apvts, const juce::String& name) {
 			factor = apvts.getRawParameterValue(name + configuration::MOD_FACTOR_SUFFIX)->load();
-			src_channel = apvts.getRawParameterValue(name + configuration::MOD_CHANNEL_SUFFIX)->load();
+			src_channel = (int)apvts.getRawParameterValue(name + configuration::MOD_CHANNEL_SUFFIX)->load();
 		}
 
 	};
@@ -93,11 +95,11 @@ namespace customDsp {
 			};
 
 			virtual void updateParams(const juce::AudioProcessorValueTreeState& apvts) override {
-
+				juce::ignoreUnused(apvts);
 			}
 
 			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
-
+				juce::ignoreUnused(layout);
 			}
 
 		private:
@@ -110,14 +112,14 @@ namespace customDsp {
 
 
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
-			data->sampleRate = spec.sampleRate;
+			data->sampleRate = (float)spec.sampleRate;
 		};
 
 		virtual void reset() override {
 		}
 
 		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
-
+			juce::ignoreUnused(context, workBuffers);
 		};
 
 	private:
@@ -175,7 +177,7 @@ namespace customDsp {
 
 		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
 			jassert(processors.size() < context.getOutputBlock().getNumChannels());
-			for (size_t i = 0; i < processors.size(); i++) {
+			for (int i = 0; i < processors.size(); i++) {
 				auto singleOutputChannel = context.getOutputBlock().getSingleChannelBlock(i);
 				juce::dsp::ProcessContextNonReplacing<float> tmp_context{ context.getInputBlock(), singleOutputChannel };
 				processors[i]->process(tmp_context, workBuffers);
@@ -303,7 +305,7 @@ namespace customDsp {
 		InterpolationOsc(SharedData* t_data) : data(t_data) {};
 
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
-			data->sampleRate = spec.sampleRate;
+			data->sampleRate = (float)spec.sampleRate;
 		};
 
 		virtual void reset() override {
@@ -335,14 +337,14 @@ namespace customDsp {
 			auto wtPosModSrc = inputBlock.getChannelPointer((size_t)data->modParams[SharedData::WT_POS].src_channel);
 
 			// envelope
-			std::function<float(size_t)> env; // TODO refactor with if
+			std::function<float(int)> env; // TODO refactor with if
 			auto envChannel = getEnvChannel();
 
 			if (envChannel == -1) { // no envelope connected
-				env = [&](size_t sample) { return 1.f; };
+				env = [&](int) { return 1.f; };
 			}
 			else {
-				env = [&](size_t sample) { return inputBlock.getSample(envChannel, sample); };
+				env = [&](int sample) { return inputBlock.getSample(envChannel, sample); };
 			}
 
 			// calculate wave only once on a work buffer and then add it to all actual output buffers
@@ -350,13 +352,13 @@ namespace customDsp {
 			jassert(outputBlock.getNumSamples() == workBuffers.getNumSamples());
 			auto tmpPtr = workBuffers.getChannelPointer(0);
 
-			for (size_t i = 0; i < workBuffers.getNumSamples(); i++) {
+			for (int i = 0; i < workBuffers.getNumSamples(); i++) {
 				auto pitch = basePitch + pitchMod * pitchModSrc[i];
 				auto phaseStep = (juce::MathConstants<float>::twoPi * (frequency * std::powf(2.f, pitch / 12.f))) / data->sampleRate;
 				auto wtPos = baseWtPos + wtPosMod * wtPosModSrc[i];
 				auto x = phase.advance(phaseStep);
 				// important to replace instead of add here
-				tmpPtr[i] = ((1.f - wtPos) * data->wf0(x) + wtPos * data->wf1(x)) * 0.125 * velocity * env(i);
+				tmpPtr[i] = ((1.f - wtPos) * data->wf0(x) + wtPos * data->wf1(x)) * 0.125f * velocity * env(i);
 			}
 
 			for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
@@ -364,12 +366,13 @@ namespace customDsp {
 			}
 		};
 
-		int getEnvChannel() {
+		inline int getEnvChannel() {
 			auto& envModParams = data->modParams[SharedData::ENV];
 			return envModParams.isEnv() ? (int)envModParams.src_channel : -1;
 		}
 
 		void setFrequency(float t_frequency, bool force = true) {
+			juce::ignoreUnused(force);
 			frequency = t_frequency;
 		}
 
@@ -388,6 +391,137 @@ namespace customDsp {
 		JUCE_LEAK_DETECTOR(InterpolationOsc);
 	};
 
+	class LFO : public Processor {
+	public:
+
+		struct SharedData : public Processor::SharedData {
+			using Processor::SharedData::SharedData;
+
+			float wtPos, rate;
+			std::function<float(float)> wf0, wf1;
+			
+
+			virtual LFO* createProcessor() override {
+				return new LFO(this);
+			};
+
+			virtual void updateParams(const juce::AudioProcessorValueTreeState& apvts) override {
+
+				wtPos = apvts.getRawParameterValue(prefix + configuration::WT_POS_SUFFIX)->load();
+				rate = apvts.getRawParameterValue(prefix + configuration::RATE_SUFFIX)->load();
+				// will be changed later for (sample based) wavetables
+				wf0 = waveFormFunctions[static_cast<Waveform>(
+					apvts.getRawParameterValue(prefix + configuration::WF0_SUFFIX)->load())];
+				wf1 = waveFormFunctions[static_cast<Waveform>(
+					apvts.getRawParameterValue(prefix + configuration::WF1_SUFFIX)->load())];
+
+			}
+
+			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
+
+				layout.add(std::make_unique<juce::AudioParameterFloat>(
+					prefix + configuration::WT_POS_SUFFIX,
+					prefix + configuration::WT_POS_SUFFIX,
+					juce::NormalisableRange<float>(0.0f, 1.0f, 0.025f, 1.f),
+					0.f));
+				layout.add(std::make_unique<juce::AudioParameterFloat>(
+					prefix + configuration::RATE_SUFFIX,
+					prefix + configuration::RATE_SUFFIX,
+					juce::NormalisableRange<float>(0.001f, 20.0f, 0.001f, 0.5f),
+					2.f));
+
+				layout.add(std::make_unique<juce::AudioParameterChoice>(
+					prefix + configuration::WF0_SUFFIX,
+					prefix + configuration::WF0_SUFFIX,
+					waveFormStrings,
+					0));
+				layout.add(std::make_unique<juce::AudioParameterChoice>(
+					prefix + configuration::WF1_SUFFIX,
+					prefix + configuration::WF1_SUFFIX,
+					waveFormStrings,
+					1));
+			}
+
+			enum Waveform {
+				Sine,
+				Square,
+				Triangle,
+				Saw
+			};
+
+			inline static const float SINE_FUNC(float x) {
+				return std::sinf(x);
+			}
+
+			inline static const float SAW_FUNC(float x) {
+				jassert(0.f <= x && x <= juce::MathConstants<float>::twoPi);
+				return (x / juce::MathConstants<float>::pi) - 1;
+			}
+
+			inline static const float SQUARE_FUNC(float x) {
+				jassert(0.f <= x && x <= juce::MathConstants<float>::twoPi);
+				return x >= juce::MathConstants<float>::pi ? -1.f : 1.f;
+			}
+
+			inline static const float TRIANGLE_FUNC(float x) {
+				jassert(0.f <= x && x <= juce::MathConstants<float>::twoPi);
+				float norm_x = x / juce::MathConstants<float>::pi; // range [0,2]
+				if (norm_x < 1.f) {
+					return -1 + 2 * norm_x;
+				}
+				else {
+					return 3 - 2 * norm_x;
+				}
+			}
+
+			const std::function<float(float)> waveFormFunctions[4]{ SINE_FUNC, SQUARE_FUNC, TRIANGLE_FUNC, SAW_FUNC };
+			juce::StringArray waveFormStrings{ "Sine", "Square", "Triangle", "Saw" };
+
+		private:
+			JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SharedData)
+		};
+
+		LFO() = delete;
+
+		LFO(SharedData* t_data) : data(t_data){}
+
+		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
+			data->sampleRate = (float)spec.sampleRate;
+		};
+
+		virtual void reset() override {
+			phase.reset();
+		}
+
+		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
+			auto& outputBlock = context.getOutputBlock();
+
+			// calculate wave only once on a work buffer and then add it to all actual output buffers
+			// (since this is a lfo, this is theoretically not needed)
+			jassert(WORK_BUFFERS >= 1);
+			jassert(outputBlock.getNumSamples() == workBuffers.getNumSamples());
+			auto tmpPtr = workBuffers.getChannelPointer(0);
+
+			auto phaseStep = (juce::MathConstants<float>::twoPi * data->rate) / data->sampleRate;
+			auto wtPos = data->wtPos;
+			for (size_t i = 0; i < workBuffers.getNumSamples(); i++) {
+				auto x = phase.advance(phaseStep);
+				// important to replace instead of add here
+				tmpPtr[i] = ((1.f - wtPos) * data->wf0(x) + wtPos * data->wf1(x));
+			}
+
+			for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
+				outputBlock.getSingleChannelBlock(channel).add(workBuffers.getSingleChannelBlock(0));
+			}
+		};
+
+	private:
+		SharedData* data;
+
+		juce::dsp::Phase<float> phase;
+
+		JUCE_LEAK_DETECTOR(LFO);
+	};
 
 	class Gain : public Processor {
 	public:
@@ -429,7 +563,7 @@ namespace customDsp {
 
 
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
-			data->sampleRate = spec.sampleRate;
+			data->sampleRate = (float)spec.sampleRate;
 		};
 
 		virtual void reset() override {
@@ -456,7 +590,7 @@ namespace customDsp {
 		JUCE_LEAK_DETECTOR(Gain);
 	};
 
-
+	// TODO change function! this sounds like shit
 	class Envelope : public Processor {
 	public:
 
@@ -520,17 +654,18 @@ namespace customDsp {
 
 
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
-			data->sampleRate = spec.sampleRate;
+			data->sampleRate = (float)spec.sampleRate;
 		};
 
 		virtual void reset() override {
 			stage = Stage::IDLE;
 			level = 0.f;
 			multiplier = 0.f;
-			samplesUntilTransition = -1;
+			samplesUntilTransition = (size_t) - 1;
 		}
 
 		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
+			juce::ignoreUnused(workBuffers);
 			if (stage == Stage::IDLE) {
 				return;
 			}
@@ -584,22 +719,22 @@ namespace customDsp {
 			} while (stage != Stage::IDLE && data->stageValues[(int)stage] == 0.f);
 
 			if (stage == Stage::ATTACK) {
-				samplesUntilTransition = data->sampleRate * data->stageValues[(int)Stage::ATTACK];
+				samplesUntilTransition = (size_t)(data->sampleRate * data->stageValues[(int)Stage::ATTACK]);
 				level = data->minLevel;
 				multiplier = getMultiplier(level, 1.f, samplesUntilTransition);
 			}
 			else if (stage == Stage::DECAY) {
-				samplesUntilTransition = data->sampleRate * data->stageValues[(int)Stage::DECAY];
+				samplesUntilTransition = (size_t)(data->sampleRate * data->stageValues[(int)Stage::DECAY]);
 				level = 1.f;
 				multiplier = getMultiplier(level, data->stageValues[(int)Stage::SUSTAIN], samplesUntilTransition);
 			}
 			else if (stage == Stage::SUSTAIN) {
-				samplesUntilTransition = -1;
+				samplesUntilTransition = (size_t) - 1;
 				level = data->stageValues[(int)Stage::SUSTAIN];
 				multiplier = 1.f;
 			}
 			else if (stage == Stage::RELEASE) {
-				samplesUntilTransition = data->sampleRate * data->stageValues[(int)Stage::RELEASE];
+				samplesUntilTransition = (size_t)(data->sampleRate * data->stageValues[(int)Stage::RELEASE]);
 				multiplier = getMultiplier(level, data->minLevel, samplesUntilTransition);
 			}
 			else {

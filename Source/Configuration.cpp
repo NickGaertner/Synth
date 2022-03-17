@@ -38,10 +38,13 @@ namespace configuration {
 	const juce::String MOD_FACTOR_SUFFIX{ "::MOD_FACTOR" };
 	const juce::String ENV_SUFFIX{"::ENV"};
 	const juce::String WT_POS_SUFFIX{"::WT_POS"};
+	const juce::String WF0_SUFFIX{"::WF0"};
+	const juce::String WF1_SUFFIX{"WF1"};
 	const juce::String PITCH_SUFFIX{"::PITCH"};
 	const juce::String GAIN_SUFFIX{"::GAIN"};
 	const juce::String ATTACK_SUFFIX{"::ATTACK"};
 	const juce::String DECAY_SUFFIX{"::DECAY"};
 	const juce::String SUSTAIN_SUFFIX{"::SUSTAIN"};
 	const juce::String RELEASE_SUFFIX{"::RELEASE"};
+	const juce::String RATE_SUFFIX{"::RATE"};
 }
