@@ -4,6 +4,7 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "Configuration.h"
+#include "Wavetable.h"
 
 namespace customGui {
 
@@ -267,10 +268,10 @@ namespace customGui {
 		virtual ~EnvModule() override {}
 
 	protected:
-		NamedKnob attackKnob{ "Attack" };
-		NamedKnob decayKnob{ "Decay" };
-		NamedKnob sustainKnob{ "Sustain" };
-		NamedKnob releaseKnob{ "Release" };
+		NamedKnob attackKnob{ "Attack"};
+		NamedKnob decayKnob{ "Decay"};
+		NamedKnob sustainKnob{ "Sustain"};
+		NamedKnob releaseKnob{ "Release"};
 
 	private:
 

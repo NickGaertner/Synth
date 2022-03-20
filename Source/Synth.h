@@ -1,23 +1,24 @@
 #pragma once
 
 #include <JuceHeader.h>
-#include "CustomDSP.h"
+#include "DSP.h"
 
 namespace Synth
 {
 
 	class Synth : public juce::Synthesiser {
+		using Synthesiser::Synthesiser;
 	public:
-		
+
 		void prepare(const juce::dsp::ProcessSpec& spec);
-	
+
 	private:
-		JUCE_LEAK_DETECTOR(Synth)
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Synth)
 	};
 
 
 	class SynthVoice : public juce::SynthesiserVoice {
-	
+		using SynthesiserVoice::SynthesiserVoice;
 	public:
 
 		void prepare(const juce::dsp::ProcessSpec& spec);
@@ -37,18 +38,18 @@ namespace Synth
 		juce::HeapBlock<char> heapBlock;
 		juce::dsp::AudioBlock<float> tmpAudioBlock;
 
-		JUCE_LEAK_DETECTOR(SynthVoice)
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthVoice)
 	};
 
 	class SynthSound : public juce::SynthesiserSound {
-	
 	public:
+		SynthSound(){}
 
 		virtual bool appliesToNote(int midiNoteNumber) override;
 		virtual bool appliesToChannel(int midiChannel) override;
 
 	private:
-		JUCE_LEAK_DETECTOR(SynthSound)
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthSound)
 	};
 
 }

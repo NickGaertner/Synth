@@ -29,6 +29,7 @@ namespace configuration {
 	extern const juce::String WT_POS_SUFFIX;
 	extern const juce::String WF0_SUFFIX;
 	extern const juce::String WF1_SUFFIX;
+	extern const juce::String WT_SUFFIX;
 	extern const juce::String PITCH_SUFFIX;
 	extern const juce::String GAIN_SUFFIX;
 	extern const juce::String ATTACK_SUFFIX;

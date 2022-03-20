@@ -9,7 +9,7 @@
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "Synth.h"
-
+#include "Wavetable.h"
 //==============================================================================
 SynthAudioProcessor::SynthAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -29,6 +29,7 @@ SynthAudioProcessor::SynthAudioProcessor()
 
 SynthAudioProcessor::~SynthAudioProcessor()
 {
+	wavetable::WavetableManager::cleanUp();
 }
 
 //==============================================================================
@@ -212,7 +213,7 @@ void SynthAudioProcessor::initSynths()
 			synth.addVoice(voice);
 		}
 
-		synth.addSound(new Synth::SynthSound());
+		synth.addSound(new Synth::SynthSound{});
 	}
 }
 

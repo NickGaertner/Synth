@@ -11,6 +11,7 @@
 #include <JuceHeader.h>
 #include "Synth.h"
 #include "Configuration.h"
+#include "DSP.h"
 
 //==============================================================================
 /**

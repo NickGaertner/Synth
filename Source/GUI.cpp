@@ -159,8 +159,8 @@ customGui::OscModule::OscModule(SynthAudioProcessor& audioProcessor, int id) :
 	auto& apvts = audioProcessor.getApvts();
 
 	buttonAttachments.add(new ButtonAttachment(apvts, prefix + configuration::BYPASSED_SUFFIX, powerAndName.powerButton));
-	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + "WF_1", dropDown)); // TODO change when we have sampled wavetables
-	dropDown.addItemList({ "0", "1", "2", "3" }, 1);
+	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + configuration::WT_SUFFIX, dropDown)); 
+	dropDown.addItemList(wavetable::WavetableManager::getWavetableNames(),1);
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::WT_POS_SUFFIX, wtPosKnob.slider));
 	sliderAttachments.add(new SliderAttachment(apvts,
