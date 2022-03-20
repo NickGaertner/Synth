@@ -4,7 +4,7 @@
 namespace customDsp {
 	// TODO delete
 	juce::dsp::LadderFilter<float> a;
-	juce::dsp::StateVariableFilter::Filter<float> b;
+	juce::dsp::StateVariableTPTFilter<float> b;
 
 	void Envelope::reset() {
 		stage = Stage::IDLE;

@@ -243,7 +243,7 @@ namespace customDsp {
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
 					prefix + configuration::WT_POS_SUFFIX,
 					prefix + configuration::WT_POS_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 1.0f, 0.025f, 1.f),
+					juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f, 1.f),
 					0.f));
 				ModulationParam::addModParams(layout, prefix + configuration::WT_POS_SUFFIX);
 

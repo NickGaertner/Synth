@@ -5,13 +5,11 @@ namespace wavetable {
 	// TODO let the oscs do all the logic since it should be much faster
 	float Wavetable::getSample(int exponent, float wtPos, float phase) const
 	{
-		jassert(4 <= exponent && exponent <= 14);
 		jassert(0.f <= phase && phase <= juce::MathConstants<float>::twoPi);
 		jassert(-1.f <= wtPos && wtPos <= 2.f); // we can break the [0,1] limit with modulation
 		wtPos = std::clamp(wtPos, 0.f, 1.f);
 
-		// number of representable harmonics (Nyquist)
-		auto& wt = tables[exponent - 4];
+		auto& wt = getTable(exponent);
 
 		auto scaledWtPos = wtPos * (wt.getNumChannels() - 1 - 1);
 		int channelIndex = static_cast<int>(scaledWtPos);
@@ -28,6 +26,12 @@ namespace wavetable {
 		auto sample1 = (1.f - phaseDelta) * channel1[sampleIndex] + (phaseDelta)*channel1[sampleIndex + 1];
 
 		return (1.f - channelDelta) * sample0 + channelDelta * sample1;
+	}
+
+	const juce::AudioBuffer<float>& Wavetable::getTable(int exponent) const
+	{
+		jassert(4 <= exponent && exponent <= 14);
+		return tables[exponent - 4];
 	}
 
 	const juce::String& Wavetable::getName()
@@ -64,7 +68,7 @@ namespace wavetable {
 				buffer.addFrom(i, 0, buffer, j, 0, wtResolution);
 			}
 			// normalize
-			buffer.applyGain(i, 0, wtResolution, buffer.getMagnitude(i, 0, wtResolution));
+			buffer.applyGain(i, 0, wtResolution, 1.0/buffer.getMagnitude(i, 0, wtResolution));
 		}
 
 		for (int exponent = 4; exponent <= 14; exponent++) {
@@ -87,6 +91,9 @@ namespace wavetable {
 				}
 				// for wrap condition
 				channel[wtResolution] = channel[0];
+
+				// normalize
+				wt.applyGain(i,0,wtResolution, 1.0 / wt.getMagnitude(i,0,wtResolution));
 			}
 
 			// last channel can be left empty/uninitialized since it won't be accessed
@@ -114,27 +121,30 @@ namespace wavetable {
 		}
 	}
 
-
+	// the wavetables need to be added in the order of the enum
 	void WavetableManager::initAll()
-	{
-		Wavetable* wt = new SquareHarmonicsWavetable();
-		wavetables.add(wt);
-		wavetableNames.add(wt->getName());
+	{	
+		if (wavetables.size() != 0) {
+			return;
+		}
 
-		wt = new TriangleHarmonicsWavetable();
-		wavetables.add(wt);
-		wavetableNames.add(wt->getName());
+		auto add = [&](Wavetable* wt) {
+			wavetables.add(wt);
+			wavetableNames.add(wt->getName());
+		};
 
-		wt = new SawHarmonicsWavetable();
-		wavetables.add(wt);
-		wavetableNames.add(wt->getName());
+		add(new SawHarmonicsWavetable());
+		add(new SquareHarmonicsWavetable());
+		add(new TriangleHarmonicsWavetable());
+		add(new PWMWavetable());
+		add(new TrapezWavetable());
+
+		jassert(wavetables.size() == wavetableNames.size() && wavetables.size() == NUMBER_OF_WT);
 	}
 
 	const Wavetable* WavetableManager::getWavetable(int index, double sampleRate)
 	{
-		if (wavetables.size() == 0) {
-			initAll();
-		}
+		initAll();
 		jassert(0 <= index && index < wavetables.size());
 		wavetables[index]->create(sampleRate);
 		return wavetables[index];
@@ -142,9 +152,7 @@ namespace wavetable {
 
 	const juce::StringArray& WavetableManager::getWavetableNames()
 	{
-		if (wavetableNames.size() == 0) {
-			initAll();
-		}
+		initAll();
 		return wavetableNames;
 	}
 
@@ -204,6 +212,83 @@ namespace wavetable {
 			}
 		}
 		createFromHarmonicWeights(sampleRate, weights);
+		oldSampleRate = sampleRate;
+	}
+
+	void PWMWavetable::create(double sampleRate)
+	{
+		// check if up to date
+		if (oldSampleRate == sampleRate) {
+			return;
+		}
+
+		updateSineValues(sampleRate);
+		auto saw = WavetableManager::getWavetable(WavetableManager::SAW_HARMONICS, sampleRate);
+
+		// TODO make 63 a constant and refactor code
+		for (int exponent = 4; exponent <= 14; exponent++) {
+			tables[exponent - 4] = juce::AudioBuffer<float>(63 + 1, wtResolution + 1);
+			auto& wt = tables[exponent - 4];
+
+			// the second to last channel (62) has a saw wave with all available harmonics
+			auto sawChannel = saw->getTable(exponent).getReadPointer(62);
+			const float delta = 1;
+			for (int i = 0; i < 63; i++) {
+				auto* channel = wt.getWritePointer(i);
+				// we dont want the case wtPosition = 0 since this would result in a constant wavefunction
+				float wtPosition = (i + delta) / (62.0+delta);
+
+				for (int sample = 0; sample < wtResolution; sample++) {
+					channel[sample] = sawChannel[sample] - sawChannel[(sample + (int)(wtPosition * wtResolution / 2.f))%wtResolution] + (wtPosition - 1);
+				}
+				// for wrap condition
+				channel[wtResolution] = channel[0];
+
+				// normalize
+				wt.applyGain(i, 0, wtResolution, 1.0 / wt.getMagnitude(i, 0, wtResolution));
+			}
+
+			// last channel can be left empty/uninitialized since it won't be accessed
+		}
+		oldSampleRate = sampleRate;
+	}
+
+	void TrapezWavetable::create(double sampleRate)
+	{
+		// check if up to date
+		if (oldSampleRate == sampleRate) {
+			return;
+		}
+
+		updateSineValues(sampleRate);
+		auto triangle = WavetableManager::getWavetable(WavetableManager::TRIANGLE_HARMONICS, sampleRate);
+
+		// TODO make 63 a constant and refactor code
+		for (int exponent = 4; exponent <= 14; exponent++) {
+			tables[exponent - 4] = juce::AudioBuffer<float>(63 + 1, wtResolution + 1);
+			auto& wt = tables[exponent - 4];
+
+			// the second to last channel (62) has a triangle wave with all available harmonics
+			auto triangleChannel = triangle->getTable(exponent).getReadPointer(62);
+			const float delta = 1;
+			for (int i = 0; i < 63; i++) {
+				auto* channel = wt.getWritePointer(i);
+				// we dont want the case wtPosition = 1 since we divide by (wtPosition - 1)
+				float wtPosition = (i ) / (62.0 + delta);
+
+				for (int sample = 0; sample < wtResolution; sample++) {
+					jassert(1.f - wtPosition != 0.f);
+					channel[sample] = (triangleChannel[sample] + triangleChannel[(sample + (int)(wtPosition * wtResolution / 2.f)) % wtResolution])/(2.f*(1.f-wtPosition));
+				}
+				// for wrap condition
+				channel[wtResolution] = channel[0];
+
+				// normalize
+				wt.applyGain(i, 0, wtResolution, 1.0 / wt.getMagnitude(i, 0, wtResolution));
+			}
+
+			// last channel can be left empty/uninitialized since it won't be accessed
+		}
 		oldSampleRate = sampleRate;
 	}
 }
