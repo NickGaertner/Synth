@@ -155,12 +155,30 @@ namespace customDsp {
 		auto& outputBlock = context.getOutputBlock();
 
 		float phaseStep = (juce::MathConstants<float>::twoPi * data->rate) / (float)data->sampleRate;
+		
+		auto& wt = data->wt->getTable(30.f); // just get a low freq table
+
 		auto wtPos = data->wtPos;
+		auto scaledWtPos = wtPos * (wt.getNumChannels() - 1 - 1);
+		int channelIndex = static_cast<int>(scaledWtPos);
+		auto channelDelta = scaledWtPos - channelIndex;
+
+		auto channel0 = wt.getReadPointer(channelIndex);
+		auto channel1 = wt.getReadPointer(channelIndex + 1);
+
 		for (int start = 0; start < workBuffers.getNumSamples(); start += configuration::MOD_BLOCK_SIZE) {
 			auto length = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples()) - start;
-			auto x = phase.advance(phaseStep*length);
-			auto value = juce::jmap(wtPos, data->wf0(x), data->wf1(x));
-			outputBlock.getSubBlock(start, length).add(value);
+
+			auto x = phase.advance(phaseStep * length);
+
+			auto scaledX = (x / juce::MathConstants<float>::twoPi) * (wt.getNumSamples() - 1);
+			int sampleIndex = static_cast<int>(scaledX);
+			auto xDelta = scaledX - sampleIndex;
+			auto sample0 = juce::jmap(xDelta, channel0[sampleIndex], channel0[sampleIndex + 1]);
+			auto sample1 = juce::jmap(xDelta, channel1[sampleIndex], channel1[sampleIndex + 1]);
+
+			auto sample = juce::jmap(channelDelta, sample0, sample1);
+			outputBlock.getSubBlock(start, length).add(sample);
 		}
 	};
 

@@ -55,6 +55,7 @@ namespace configuration {
 	const juce::String CUTOFF_SUFFIX{"::CUTOFF"};
 	const juce::String RESONANCE_SUFFIX{"::RES"};
 	const juce::String DRIVE_SUFFIX{"::DRIVE"};
+	const juce::String SPECIAL_SUFFIX{"::SPECIAL"};
 	const juce::String FILTER_TYPE_SUFFIX{"::FILTER_TYPE"};
 
 }

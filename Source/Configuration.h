@@ -43,6 +43,7 @@ namespace configuration {
 	extern const juce::String CUTOFF_SUFFIX;
 	extern const juce::String RESONANCE_SUFFIX;
 	extern const juce::String DRIVE_SUFFIX;
+	extern const juce::String SPECIAL_SUFFIX;
 	extern const juce::String FILTER_TYPE_SUFFIX;
 
 }

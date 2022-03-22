@@ -6,19 +6,22 @@ void customDsp::FilterChooser::createFilter(FilterType type) {
 		filter = std::make_unique<DummyFilter>(data);
 	}
 	else {
-		filter = std::make_unique<LadderFilter>(data);
+		filter = std::make_unique<TPTFilter>(data);
 	}
 
-	filter->updateMode();
+	filter->prepareUpdate();
 }
 
 void customDsp::FilterChooser::prepare(const juce::dsp::ProcessSpec& spec) {
 	data->sampleRate = spec.sampleRate;
-	filter->prepare(spec);
+	data->numberOfChannels = spec.numChannels;
+	createFilter(data->filterType);
 }
 
 void customDsp::FilterChooser::reset() {
-	filter->reset();
+	if (filter != nullptr) {
+		filter->reset();
+	}
 }
 
 void customDsp::FilterChooser::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
@@ -37,117 +40,82 @@ void customDsp::FilterChooser::process(juce::dsp::ProcessContextNonReplacing<flo
 	filter->process(context, workBuffers);
 };
 
-void customDsp::LadderFilter::prepare(const juce::dsp::ProcessSpec& spec) {
-	state.resize(spec.numChannels);
-	reset();
-}
-
-void customDsp::LadderFilter::reset()
-{
-	for (auto& s : state) {
-		s.fill(0.f);
+void customDsp::TPTFilter::prepareUpdate() {
+	if (data->numberOfChannels > 0) {
+		s1.resize(data->numberOfChannels);
+		s2.resize(data->numberOfChannels);
+		updateMode();
+		reset();
 	}
 }
 
-void customDsp::LadderFilter::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
-{
+void customDsp::TPTFilter::reset() {
+	for (auto v : { &s1, &s2 }) {
+		std::fill(v->begin(), v->end(), 0.f);
+	}
+}
+
+void customDsp::TPTFilter::updateMode() {
+	mode = data->filterType;
+}
+
+void customDsp::TPTFilter::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) {
+
 	if (data->bypassed || context.isBypassed) {
 		return;
 	}
-	setDrive(1.2f);
 
-	const auto& inputBlock = context.getInputBlock();
+	auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
 	auto& outputBlock = context.getOutputBlock();
 
-	float cutoffTransformValue = std::exp(cutoffFreqHz * (-juce::MathConstants<float>::twoPi / data->sampleRate));
-	float scaledResonanceValue = juce::jmap(resonance, 0.1f, 1.0f);
+	float cutoffBase = data->cutoff;
+	auto cutoffMod = data->modParams[FilterChooser::SharedData::CUTOFF].factor;
+	auto cutoffModSrc = inputBlock.getChannelPointer((size_t)data->modParams[FilterChooser::SharedData::CUTOFF].src_channel);
 
-	const auto a1 = cutoffTransformValue;
-	const auto g = 1.f - a1;
-	const auto b0 = g * 0.76923076923f;
-	const auto b1 = g * 0.23076923076f;
+	float resonanceBase = data->resonance;
+	auto resonanceMod = data->modParams[FilterChooser::SharedData::RES].factor;
+	auto resonanceModSrc = inputBlock.getChannelPointer((size_t)data->modParams[FilterChooser::SharedData::RES].src_channel);
 
-	const auto A0 = A[0];
-	const auto A1 = A[1];
-	const auto A2 = A[2];
-	const auto A3 = A[3];
-	const auto A4 = A[4];
+	for (int start = 0; start < outputBlock.getNumSamples(); start += configuration::MOD_BLOCK_SIZE) {
 
-	for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
+		auto end = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples());
 
-		auto dxBlock = workBuffers.getSingleChannelBlock(0);
-		dxBlock.replaceWithProductOf(outputBlock.getSingleChannelBlock(channel), drive);
-		juce::dsp::FastMathApproximations::tanh(dxBlock.getChannelPointer(0), dxBlock.getNumSamples());
-		dxBlock.multiplyBy(gain);
-		const auto dx = dxBlock.getChannelPointer(0);
+		auto currentCutoff = juce::jmap(juce::jlimit(0.f,1.f,cutoffBase + cutoffMod * cutoffModSrc[start]), 100.f, 1900.f);
+		float g = juce::dsp::FastMathApproximations::tan(juce::MathConstants<float>::pi * currentCutoff / data->sampleRate);
 
-		auto outputChannel = outputBlock.getChannelPointer(channel);
-		auto& s = state[channel];
+		auto currentResonance = juce::jmap(juce::jlimit(0.f, 1.f, resonanceBase + resonanceMod * resonanceModSrc[start]), 0.1f, 2.f);
+		float R2 = 1.0f / currentResonance;
+		float h = 1.0f / (1.0f + R2 * g + g * g);
 
-		// use local variables for our calculation to avoid excessive array access
-		// (array access was responsible for most of this methods cpu usage)
-		auto s0 = s[0];
-		auto s1 = s[1];
-		auto s2 = s[2];
-		auto s3 = s[3];
-		auto s4 = s[4];
+		for (int channel = 0; channel < outputBlock.getNumChannels(); channel++) {
+			auto* channelPtr = outputBlock.getChannelPointer(channel);
 
-		for (size_t n = 0; n < outputBlock.getNumSamples(); n++) {
+			auto ls1 = s1[channel];
+			auto ls2 = s2[channel];
 
-			const auto a = dx[n] + scaledResonanceValue * -4.f * (gain2 * juce::dsp::FastMathApproximations::tanh(drive2 * s4) - dx[n] * comp);
+			for (int sample = start; sample < end; sample++) {
 
-			const auto b = b1 * s0 + a1 * s1 + b0 * a;
-			const auto c = b1 * s1 + a1 * s2 + b0 * b;
-			const auto d = b1 * s2 + a1 * s3 + b0 * c;
-			const auto e = b1 * s3 + a1 * s4 + b0 * d;
+				auto yHP = h * (channelPtr[sample] - ls1 * (g + R2) - ls2);
 
-			s0 = a;
-			s1 = b;
-			s2 = c;
-			s3 = d;
-			s4 = e;
+				auto yBP = yHP * g + ls1;
+				ls1 = yHP * g + yBP;
 
-			outputChannel[n] = a * A0 + b * A1 + c * A2 + d * A3 + e * A4;
+				auto yLP = yBP * g + ls2;
+				ls2 = yBP * g + yLP;
+
+				float value;
+				switch (mode) { //actually not slow
+				case FilterType::TPT_LPF12: value = yLP; break;
+				case FilterType::TPT_BPF12: value = yBP; break;
+				case FilterType::TPT_HPF12: value = yHP; break;
+				default: jassertfalse; break;
+				}
+				channelPtr[sample] = value;
+			}
+
+			s1[channel] = ls1;
+			s2[channel] = ls2;
 		}
-
-		s[0] = s0;
-		s[1] = s1;
-		s[2] = s2;
-		s[3] = s3;
-		s[4] = s4;
 	}
+	snapToZero();
 }
-
-void customDsp::LadderFilter::updateMode()
-{
-	auto newMode = data->filterType;
-	if (newMode == mode) {
-		return;
-	}
-	mode = newMode;
-
-	switch (mode) {
-	case FilterType::LADDER_LPF12:   A = { { 0.f, 0.f,  1.f, 0.f,  0.f } }; comp = 0.5f;  break;
-	case FilterType::LADDER_HPF12:   A = { { 1.f, -2.f, 1.f, 0.f,  0.f } }; comp = 0.f;    break;
-	case FilterType::LADDER_BPF12:   A = { { 0.f, 0.f, -1.f, 1.f,  0.f } }; comp = 0.5f;  break;
-	case FilterType::LADDER_LPF24:   A = { { 0.f, 0.f,  0.f, 0.f,  1.f } }; comp = 0.5f;  break;
-	case FilterType::LADDER_HPF24:   A = { { 1.f, -4.f, 6.f, -4.f, 1.f } }; comp = 0.f;    break;
-	case FilterType::LADDER_BPF24:   A = { { 0.f, 0.f,  1.f, -2.f, 1.f } }; comp = 0.5f;  break;
-	default: jassertfalse; break;
-	}
-	for (auto& a : A) {
-		a *= 1.2f;
-	}
-
-	reset();
-}
-void customDsp::LadderFilter::setDrive(float newDrive)
-{
-	jassert(1.f <= newDrive);
-	drive = newDrive;
-	gain = std::powf(drive, -2.642f) * 0.6103f + 0.3903f;
-	drive2 = drive * 0.04f + 0.96f;
-	gain2 = std::powf(drive2, -2.642f) * 0.6103f + 0.3903f;
-}
-
-

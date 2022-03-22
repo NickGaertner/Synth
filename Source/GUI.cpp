@@ -212,9 +212,9 @@ customGui::FilterModule::FilterModule(SynthAudioProcessor& audioProcessor, int i
 		juce::GridItem(resonanceModKnob).withArea(Property(3), Property(2)),
 		juce::GridItem(resonanceModSrcChooser).withArea(Property(4), Property(2)),
 
-		juce::GridItem(driveKnob).withArea(Property(2), Property(3)),
-		juce::GridItem(driveModKnob).withArea(Property(3), Property(3)),
-		juce::GridItem(driveModSrcChooser).withArea(Property(4), Property(3)),
+		juce::GridItem(specialKnob).withArea(Property(2), Property(3)),
+		juce::GridItem(specialModKnob).withArea(Property(3), Property(3)),
+		juce::GridItem(specialModSrcChooser).withArea(Property(4), Property(3)),
 		});
 
 	addAndMakeVisible(cutoffKnob);
@@ -225,9 +225,9 @@ customGui::FilterModule::FilterModule(SynthAudioProcessor& audioProcessor, int i
 	addAndMakeVisible(resonanceModKnob);
 	addAndMakeVisible(resonanceModSrcChooser);
 
-	addAndMakeVisible(driveKnob);
-	addAndMakeVisible(driveModKnob);
-	addAndMakeVisible(driveModSrcChooser);
+	addAndMakeVisible(specialKnob);
+	addAndMakeVisible(specialModKnob);
+	addAndMakeVisible(specialModSrcChooser);
 
 	// VALUE TREE ATTACHMENTS
 	auto& apvts = audioProcessor.getApvts();
@@ -254,14 +254,14 @@ customGui::FilterModule::FilterModule(SynthAudioProcessor& audioProcessor, int i
 		resonanceModSrcChooser));
 	resonanceModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 
-	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::DRIVE_SUFFIX, driveKnob.slider));
+	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::DRIVE_SUFFIX, specialKnob.slider));
 	sliderAttachments.add(new SliderAttachment(apvts,
 		prefix + configuration::DRIVE_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
-		driveModKnob.slider));
+		specialModKnob.slider));
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
 		prefix + configuration::DRIVE_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
-		driveModSrcChooser));
-	driveModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
+		specialModSrcChooser));
+	specialModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 }
 
 customGui::EnvModule::EnvModule(SynthAudioProcessor& audioProcessor, int id) :
@@ -304,29 +304,23 @@ customGui::LFOModule::LFOModule(SynthAudioProcessor& audioProcessor, int id)
 	// LAYOUT
 	powerAndName.powerButton.setVisible(false);
 	powerAndName.nameLabel.setText(juce::String(prefix), juce::NotificationType::dontSendNotification);
-	dropDown.setVisible(false);
 
 	mainGrid.items.addArray({
-		juce::GridItem(wf0Chooser).withArea(Property(2), Property(1), Property(4), Property(1)),
 		juce::GridItem(wtPosKnob).withArea(Property(2), Property(2)),
 		juce::GridItem(rateKnob).withArea(Property(3), Property(2)),
-		juce::GridItem(wf1Chooser).withArea(Property(2), Property(3),Property(4),Property(3)),
 		});
 
-	addAndMakeVisible(wf0Chooser);
-	addAndMakeVisible(wf1Chooser);
 	addAndMakeVisible(wtPosKnob);
 	addAndMakeVisible(rateKnob);
-
+	
 	// VALUE TREE ATTACHMENTS
 	auto& apvts = audioProcessor.getApvts();
 
-	wf0Chooser.attachToParameter(*apvts.getParameter(prefix + configuration::WF0_SUFFIX));
-	wf1Chooser.attachToParameter(*apvts.getParameter(prefix + configuration::WF1_SUFFIX));
+	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + configuration::WT_SUFFIX, dropDown));
+	dropDown.addItemList(dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(prefix + configuration::WT_SUFFIX))->choices, 1);
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::WT_POS_SUFFIX, wtPosKnob.slider));
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::RATE_SUFFIX, rateKnob.slider));
-	
 }
 
 

@@ -111,7 +111,11 @@ void SynthAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 		auto prefix = configuration::OSC_PREFIX + std::to_string(synthPos)+configuration::WT_SUFFIX;
 		apvts.getParameter(prefix)->sendValueChangedMessageToListeners(0);
 	}
-
+	for (auto lfoPos = 0; lfoPos < configuration::LFO_NUMBER; lfoPos++)
+	{
+		auto prefix = configuration::LFO_PREFIX + std::to_string(lfoPos) + configuration::WT_SUFFIX;
+		apvts.getParameter(prefix)->sendValueChangedMessageToListeners(0);
+	}
 }
 
 void SynthAudioProcessor::releaseResources()

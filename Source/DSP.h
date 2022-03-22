@@ -361,23 +361,11 @@ namespace customDsp {
 			using Processor::SharedData::SharedData;
 
 			float wtPos{ 0.f }, rate{ 1.f };
-
+			const wavetable::Wavetable* wt;
 
 			virtual LFO* createProcessor() override {
 				return new LFO(this);
 			};
-
-			//virtual void updateParams(const juce::AudioProcessorValueTreeState& apvts) override {
-
-			//	wtPos = apvts.getRawParameterValue(prefix + configuration::WT_POS_SUFFIX)->load();
-			//	rate = apvts.getRawParameterValue(prefix + configuration::RATE_SUFFIX)->load();
-			//	// will be changed later for (sample based) wavetables
-			//	wf0 = waveFormFunctions[static_cast<Waveform>(
-			//		apvts.getRawParameterValue(prefix + configuration::WF0_SUFFIX)->load())];
-			//	wf1 = waveFormFunctions[static_cast<Waveform>(
-			//		apvts.getRawParameterValue(prefix + configuration::WF1_SUFFIX)->load())];
-
-			//}
 
 			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
 
@@ -386,29 +374,24 @@ namespace customDsp {
 					prefix + configuration::WT_POS_SUFFIX,
 					juce::NormalisableRange<float>(0.0f, 1.0f, 0.025f, 1.f),
 					wtPos));
+
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
 					prefix + configuration::RATE_SUFFIX,
 					prefix + configuration::RATE_SUFFIX,
-					juce::NormalisableRange<float>(0.001f, 20.0f, 0.001f, 0.5f),
+					juce::NormalisableRange<float>(0.001f, 20.0f, 0.0001f, 0.5f),
 					rate));
 
 				layout.add(std::make_unique<juce::AudioParameterChoice>(
-					prefix + configuration::WF0_SUFFIX,
-					prefix + configuration::WF0_SUFFIX,
-					waveFormStrings,
+					prefix + configuration::WT_SUFFIX,
+					prefix + configuration::WT_SUFFIX,
+					wavetable::WavetableManager::getWavetableNames(),
 					0));
-				layout.add(std::make_unique<juce::AudioParameterChoice>(
-					prefix + configuration::WF1_SUFFIX,
-					prefix + configuration::WF1_SUFFIX,
-					waveFormStrings,
-					1));
 			}
 
 			virtual void registerAsListener(juce::AudioProcessorValueTreeState& apvts) override {
 				apvts.addParameterListener(prefix + configuration::WT_POS_SUFFIX, this);
 				apvts.addParameterListener(prefix + configuration::RATE_SUFFIX, this);
-				apvts.addParameterListener(prefix + configuration::WF0_SUFFIX, this);
-				apvts.addParameterListener(prefix + configuration::WF1_SUFFIX, this);
+				apvts.addParameterListener(prefix + configuration::WT_SUFFIX, this);
 			}
 
 			virtual void parameterChanged(const juce::String& parameterID, float newValue) override {
@@ -418,54 +401,13 @@ namespace customDsp {
 				else if (parameterID.endsWith(configuration::RATE_SUFFIX)) {
 					rate = newValue;
 				}
-				else if (parameterID.endsWith(configuration::WF0_SUFFIX)) {
-					// will be changed later for (sample based) wavetables
-					wf0 = waveFormFunctions[static_cast<Waveform>(newValue)];
-				}
-				else if (parameterID.endsWith(configuration::WF1_SUFFIX)) {
-					// will be changed later for (sample based) wavetables
-					wf1 = waveFormFunctions[static_cast<Waveform>(newValue)];
+				else if (parameterID.endsWith(configuration::WT_SUFFIX)) {
+					wt = wavetable::WavetableManager::getWavetable(static_cast<int>(newValue), sampleRate);
 				}
 				else {
 					jassertfalse;
 				}
 			}
-
-			enum Waveform {
-				Sine,
-				Square,
-				Triangle,
-				Saw
-			};
-
-			inline static const float SINE_FUNC(float x) {
-				return std::sinf(x);
-			}
-
-			inline static const float SAW_FUNC(float x) {
-				jassert(0.f <= x && x <= juce::MathConstants<float>::twoPi);
-				return (x / juce::MathConstants<float>::pi) - 1;
-			}
-
-			inline static const float SQUARE_FUNC(float x) {
-				jassert(0.f <= x && x <= juce::MathConstants<float>::twoPi);
-				return x >= juce::MathConstants<float>::pi ? -1.f : 1.f;
-			}
-
-			inline static const float TRIANGLE_FUNC(float x) {
-				jassert(0.f <= x && x <= juce::MathConstants<float>::twoPi);
-				float norm_x = x / juce::MathConstants<float>::pi; // range [0,2]
-				if (norm_x < 1.f) {
-					return -1 + 2 * norm_x;
-				}
-				else {
-					return 3 - 2 * norm_x;
-				}
-			}
-
-			const std::function<float(float)> waveFormFunctions[4]{ SINE_FUNC, SQUARE_FUNC, TRIANGLE_FUNC, SAW_FUNC };
-			juce::StringArray waveFormStrings{ "Sine", "Square", "Triangle", "Saw" };
-			std::function<float(float)> wf0{ waveFormFunctions[0] }, wf1{ waveFormFunctions[1] };
 
 		private:
 			JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SharedData)

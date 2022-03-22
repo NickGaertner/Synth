@@ -114,61 +114,61 @@ namespace customGui {
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PowerButton)
 	};
 
-	class BasicWaveformChooser : public juce::Component {
+	//class BasicWaveformChooser : public juce::Component {
 
-	public:
-		BasicWaveformChooser() {
-			for (int i = 0; i < std::size(buttons); i++) {
-				addAndMakeVisible(*buttons[i]);
-				buttons[i]->setRadioGroupId(1);
-				buttons[i]->onClick = [=]() {respondToClick(i); };
-			}
+	//public:
+	//	BasicWaveformChooser() {
+	//		for (int i = 0; i < std::size(buttons); i++) {
+	//			addAndMakeVisible(*buttons[i]);
+	//			buttons[i]->setRadioGroupId(1);
+	//			buttons[i]->onClick = [=]() {respondToClick(i); };
+	//		}
 
-			mainGrid.setGap(Px(0));
-			mainGrid.templateRows = { Track(Fr(1)), Track(Fr(1)) };
-			mainGrid.templateColumns = { Track(Fr(1)), Track(Fr(1)) };
+	//		mainGrid.setGap(Px(0));
+	//		mainGrid.templateRows = { Track(Fr(1)), Track(Fr(1)) };
+	//		mainGrid.templateColumns = { Track(Fr(1)), Track(Fr(1)) };
 
-			mainGrid.items.addArray({
-				juce::GridItem(sineButton).withArea(Property(1), Property(1)),
-				juce::GridItem(squareButton).withArea(Property(1), Property(2)),
-				juce::GridItem(triangleButton).withArea(Property(2), Property(1)),
-				juce::GridItem(sawButton).withArea(Property(2), Property(2)),
-				});
-		}
+	//		mainGrid.items.addArray({
+	//			juce::GridItem(sineButton).withArea(Property(1), Property(1)),
+	//			juce::GridItem(squareButton).withArea(Property(1), Property(2)),
+	//			juce::GridItem(triangleButton).withArea(Property(2), Property(1)),
+	//			juce::GridItem(sawButton).withArea(Property(2), Property(2)),
+	//			});
+	//	}
 
-		virtual void resized() override {
-			mainGrid.performLayout(getLocalBounds());
-		}
+	//	virtual void resized() override {
+	//		mainGrid.performLayout(getLocalBounds());
+	//	}
 
-		void respondToClick(int buttonNumber) {
-			if (buttons[buttonNumber]->getToggleState()) {
-				parameterAttachment->setValueAsCompleteGesture((float)buttonNumber);
-			}
-		}
+	//	void respondToClick(int buttonNumber) {
+	//		if (buttons[buttonNumber]->getToggleState()) {
+	//			parameterAttachment->setValueAsCompleteGesture((float)buttonNumber);
+	//		}
+	//	}
 
-		void parameterChanged(float value) {
-			auto index = juce::roundToInt(value);
-			jassert(0 <= index && index < std::size(buttons));
-			buttons[index]->triggerClick();
-		}
+	//	void parameterChanged(float value) {
+	//		auto index = juce::roundToInt(value);
+	//		jassert(0 <= index && index < std::size(buttons));
+	//		buttons[index]->triggerClick();
+	//	}
 
-		void attachToParameter(juce::RangedAudioParameter& parameter) {
-			parameterAttachment = std::make_unique<juce::ParameterAttachment>(parameter, [&](float x) {parameterChanged(x); });
-			parameterAttachment->sendInitialUpdate();
-		}
+	//	void attachToParameter(juce::RangedAudioParameter& parameter) {
+	//		parameterAttachment = std::make_unique<juce::ParameterAttachment>(parameter, [&](float x) {parameterChanged(x); });
+	//		parameterAttachment->sendInitialUpdate();
+	//	}
 
-	private:
-		juce::Grid mainGrid = Util::createStretchGrid();
-		// TODO change to ImageButtons
-		juce::ToggleButton sineButton{ "Sine" };
-		juce::ToggleButton squareButton{ "Square" };
-		juce::ToggleButton triangleButton{ "Triangle" };
-		juce::ToggleButton sawButton{ "Saw" };
-		juce::ToggleButton* buttons[4]{ &sineButton, &squareButton, &triangleButton, &sawButton };
-		std::unique_ptr<juce::ParameterAttachment> parameterAttachment;
+	//private:
+	//	juce::Grid mainGrid = Util::createStretchGrid();
+	//	// TODO change to ImageButtons
+	//	juce::ToggleButton sineButton{ "Sine" };
+	//	juce::ToggleButton squareButton{ "Square" };
+	//	juce::ToggleButton triangleButton{ "Triangle" };
+	//	juce::ToggleButton sawButton{ "Saw" };
+	//	juce::ToggleButton* buttons[4]{ &sineButton, &squareButton, &triangleButton, &sawButton };
+	//	std::unique_ptr<juce::ParameterAttachment> parameterAttachment;
 
-		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BasicWaveformChooser)
-	};
+	//	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BasicWaveformChooser)
+	//};
 
 	class SynthModule : public juce::Component {
 	public:
@@ -275,9 +275,9 @@ namespace customGui {
 		NamedKnob resonanceModKnob{ "Mod" };
 		ModSrcChooser resonanceModSrcChooser;
 
-		NamedKnob driveKnob{ "Drive" };
-		NamedKnob driveModKnob{ "Mod" };
-		ModSrcChooser driveModSrcChooser;
+		NamedKnob specialKnob{ "Special" };
+		NamedKnob specialModKnob{ "Mod" };
+		ModSrcChooser specialModSrcChooser;
 	private:
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FilterModule)
@@ -307,11 +307,8 @@ namespace customGui {
 		virtual ~LFOModule() override {}
 
 	protected:
-		BasicWaveformChooser wf0Chooser;
-		BasicWaveformChooser wf1Chooser;
 		NamedKnob wtPosKnob{ "WtPos" };
 		NamedKnob rateKnob{ "Rate" };
-
 
 	private:
 
