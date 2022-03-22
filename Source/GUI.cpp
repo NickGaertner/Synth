@@ -254,12 +254,12 @@ customGui::FilterModule::FilterModule(SynthAudioProcessor& audioProcessor, int i
 		resonanceModSrcChooser));
 	resonanceModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 
-	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::DRIVE_SUFFIX, specialKnob.slider));
+	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::SPECIAL_SUFFIX, specialKnob.slider));
 	sliderAttachments.add(new SliderAttachment(apvts,
-		prefix + configuration::DRIVE_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
+		prefix + configuration::SPECIAL_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
 		specialModKnob.slider));
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
-		prefix + configuration::DRIVE_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
+		prefix + configuration::SPECIAL_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		specialModSrcChooser));
 	specialModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 }
