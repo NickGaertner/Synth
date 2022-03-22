@@ -10,12 +10,11 @@ namespace wavetable {
 		Wavetable(const juce::String& t_name) : name(t_name) {};
 		virtual ~Wavetable(){}
 
-		//needs to be called before getSample() is used and should be idempotent with the same sampleRate
+		//needs to be called before getTable() is used and should be idempotent with the same sampleRate
 		virtual void create(double sampleRate) = 0;
 
-		float getSample(int exponent, float phase, float wtPos) const;
-
 		const juce::AudioBuffer<float>& getTable(int exponent) const;
+		const juce::AudioBuffer<float>& getTable(float frequency) const;
 
 		const juce::String& getName();
 
@@ -45,6 +44,7 @@ namespace wavetable {
 	};
 
 
+	// TODO load wavetables from files
 	class WavetableManager {
 	public:
 		enum {
@@ -61,6 +61,7 @@ namespace wavetable {
 		static void initAll();
 		static const Wavetable* getWavetable(int index, double sampleRate);
 		static const juce::StringArray& getWavetableNames();
+		static void prepare(const juce::dsp::ProcessSpec& spec);
 		static void cleanUp();
 	private:
 		inline static juce::OwnedArray<Wavetable> wavetables;

@@ -10,8 +10,14 @@
       <FILE id="umS1BO" name="Configuration.h" compile="0" resource="0" file="Source/Configuration.h"/>
       <FILE id="kK8DST" name="DSP.cpp" compile="1" resource="0" file="Source/DSP.cpp"/>
       <FILE id="CKUtN7" name="DSP.h" compile="0" resource="0" file="Source/DSP.h"/>
+      <FILE id="Rc8cwO" name="Filter.cpp" compile="1" resource="0" file="Source/Filter.cpp"/>
+      <FILE id="fo48Hp" name="Filter.h" compile="0" resource="0" file="Source/Filter.h"/>
+      <FILE id="G3yRay" name="FX.cpp" compile="1" resource="0" file="Source/FX.cpp"/>
+      <FILE id="ZhbeTx" name="FX.h" compile="0" resource="0" file="Source/FX.h"/>
       <FILE id="vvaxEe" name="GUI.cpp" compile="1" resource="0" file="Source/GUI.cpp"/>
       <FILE id="HNAP7f" name="GUI.h" compile="0" resource="0" file="Source/GUI.h"/>
+      <FILE id="JXe6k3" name="Modulation.cpp" compile="1" resource="0" file="Source/Modulation.cpp"/>
+      <FILE id="I2kNH1" name="Modulation.h" compile="0" resource="0" file="Source/Modulation.h"/>
       <FILE id="raFqtF" name="PluginEditor.cpp" compile="1" resource="0"
             file="Source/PluginEditor.cpp"/>
       <FILE id="u0lvsP" name="PluginEditor.h" compile="0" resource="0" file="Source/PluginEditor.h"/>

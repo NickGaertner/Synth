@@ -43,7 +43,7 @@ namespace Synth {
 	{
 		juce::ignoreUnused(velocity);
 		auto* osc = dynamic_cast<customDsp::InterpolationOsc*>(processorChain.getProcessor(0));
-		if (!allowTailOff || osc->getEnvChannel() == -1) {
+		if (!allowTailOff || osc->getEnvChannel() == configuration::EMPTY_MOD_CHANNEL) {
 			clearCurrentNote();
 			processorChain.reset();
 			modulationProcessors.reset();
@@ -70,10 +70,11 @@ namespace Synth {
 		}
 		// check if we might exited the release phase of our possible adsr and stop the note if necessary
 		auto osc = dynamic_cast<customDsp::InterpolationOsc*>(processorChain.getProcessor(0));
-		if (osc->getEnvChannel() != -1) {
+		if (osc->getEnvChannel() != configuration::EMPTY_MOD_CHANNEL) {
 			auto env = dynamic_cast<customDsp::Envelope*>(modulationProcessors.getProcessor(osc->getEnvChannel()));
 			if (env->isIdle()) {
 				stopNote(0.f, false);
+				return;
 			}
 		}
 

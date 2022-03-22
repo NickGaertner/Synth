@@ -64,18 +64,18 @@ private:
 
 	void initSynths();
 
-	std::vector<Synth::Synth> synths{configuration::OSC_NUMBER};
+	std::vector<Synth::Synth> synths{ configuration::OSC_NUMBER };
 
 	// first OSC_NUMBER entries hold synth specific data (e.g. osc settings), 
 	// the second to last entry holds synth independent data (e.g. fx)
 	// and the last entry holds modulation parameters (envs and lfos)
-	std::vector<juce::OwnedArray<customDsp::Processor::SharedData>> processorData{configuration::OSC_NUMBER+2};
+	std::vector<juce::OwnedArray<customDsp::Processor::SharedData>> processorData{ configuration::OSC_NUMBER + 2 };
 
 	juce::AudioProcessorValueTreeState::ParameterLayout createParameterDataAndLayout();
-	void updateSettings();
 
 	juce::AudioProcessorValueTreeState apvts{ *this, nullptr, "Parameters", createParameterDataAndLayout() };
 
+	juce::PerformanceCounter performanceCounter{ "ProcessingBlogCounter",500 };
 	//==============================================================================
 	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthAudioProcessor)
 };

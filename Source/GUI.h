@@ -4,7 +4,6 @@
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
 #include "Configuration.h"
-#include "Wavetable.h"
 
 namespace customGui {
 
@@ -259,6 +258,29 @@ namespace customGui {
 	private:
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(OscModule)
+	};
+
+	class FilterModule : public SynthModule {
+	public:
+		FilterModule() = delete;
+		FilterModule(SynthAudioProcessor& audioProcessor, int id);
+		virtual ~FilterModule() override {}
+
+	protected:
+		NamedKnob cutoffKnob{ "Cutoff" };
+		NamedKnob cutoffModKnob{ "Mod" };
+		ModSrcChooser cutoffModSrcChooser;
+
+		NamedKnob resonanceKnob{ "Resonance" };
+		NamedKnob resonanceModKnob{ "Mod" };
+		ModSrcChooser resonanceModSrcChooser;
+
+		NamedKnob driveKnob{ "Drive" };
+		NamedKnob driveModKnob{ "Mod" };
+		ModSrcChooser driveModSrcChooser;
+	private:
+
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FilterModule)
 	};
 
 	class EnvModule : public SynthModule {

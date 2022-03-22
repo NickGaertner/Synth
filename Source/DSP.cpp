@@ -2,9 +2,6 @@
 #include "DSP.h"
 
 namespace customDsp {
-	// TODO delete
-	juce::dsp::LadderFilter<float> a;
-	juce::dsp::StateVariableTPTFilter<float> b;
 
 	void Envelope::reset() {
 		stage = Stage::IDLE;
@@ -15,33 +12,26 @@ namespace customDsp {
 
 	void Envelope::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) {
 		juce::ignoreUnused(workBuffers);
-		if (stage == Stage::IDLE) {
+		if (stage == Stage::IDLE || context.isBypassed) {
 			return;
 		}
 		auto& outputBlock = context.getOutputBlock();
-		size_t currentPos = 0;
-		size_t samplesToProcess = outputBlock.getNumSamples();
+		auto currentPos = 0;
+		auto samplesRemaining = outputBlock.getNumSamples();
 
-		while (currentPos < samplesToProcess) {
+		while (samplesRemaining) {
 			if (samplesUntilTransition == 0) {
 				transition();
 			}
-			auto samplesThisStep = samplesUntilTransition > 0 ?
-				juce::jmin(samplesUntilTransition, samplesToProcess) : samplesToProcess;
+			auto samplesThisStep = samplesUntilTransition > 0 ? // "Do I need to transition at some point (>0)?"
+				juce::jmin((int)juce::jmin(samplesUntilTransition, samplesRemaining), configuration::MOD_BLOCK_SIZE) // ouch
+				: juce::jmin((int)samplesRemaining, configuration::MOD_BLOCK_SIZE);
 
-			auto tmp_level = level;
-			for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
-				tmp_level = level;
-				auto channelPtr = outputBlock.getChannelPointer(channel);
-				for (size_t i = currentPos; i < samplesThisStep; i++) {
-					channelPtr[i] = tmp_level;
-					tmp_level += summand;
-				}
-			}
-
-			level = tmp_level;
+			outputBlock.getSubBlock(currentPos, samplesThisStep).add(level);
+			level += summand * samplesThisStep;
 			currentPos += samplesThisStep;
 			samplesUntilTransition -= samplesThisStep;
+			samplesRemaining -= samplesThisStep;
 		}
 	};
 
@@ -87,12 +77,8 @@ namespace customDsp {
 
 	void InterpolationOsc::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
 	{
-		if (data->bypassed) {
+		if (data->bypassed || context.isBypassed) {
 			return;
-		}
-
-		if (context.isBypassed) {
-			jassertfalse; // normally shouldn't land here
 		}
 
 		auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
@@ -110,38 +96,92 @@ namespace customDsp {
 		auto wtPosMod = data->modParams[SharedData::WT_POS].factor;
 		auto wtPosModSrc = inputBlock.getChannelPointer((size_t)data->modParams[SharedData::WT_POS].src_channel);
 
-		// envelope
-		std::function<float(int)> env; // TODO refactor with if
-		auto envChannel = getEnvChannel();
-
-		if (envChannel == -1) { // no envelope connected
-			env = [&](int) { return 1.f; };
-		}
-		else {
-			env = [&](int sample) { return inputBlock.getSample(envChannel, sample); };
-		}
-
 		// calculate wave only once on a work buffer and then add it to all actual output buffers
 		jassert(WORK_BUFFERS >= 1);
 		jassert(outputBlock.getNumSamples() == workBuffers.getNumSamples());
 		auto tmpPtr = workBuffers.getChannelPointer(0);
 
 		// disregard pitch modulation when considering harmonics
-		int exponent;
-		std::frexpf(frequency * std::powf(2.f, (basePitch + pitchMod * pitchModSrc[0]) / 12.f), &exponent);
+		auto& wt = data->wt->getTable(frequency * std::exp2f((basePitch + pitchMod * pitchModSrc[0]) / 12.f));
 
-		for (int i = 0; i < workBuffers.getNumSamples(); i++) {
-			auto pitch = basePitch + pitchMod * pitchModSrc[i];
-			auto actualFrequency = (frequency * std::powf(2.f, pitch / 12.f));
+		for (int start = 0; start < workBuffers.getNumSamples(); start += configuration::MOD_BLOCK_SIZE) {
+			
+			auto end = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples());
+
+			// calculate modulated arguments for the next ~MOD_BLOCK_SIZE samples
+			auto pitch = basePitch + pitchMod * pitchModSrc[start];
+			auto actualFrequency = (frequency * std::exp2f(pitch / 12.f));
 			float phaseStep = (juce::MathConstants<float>::twoPi * actualFrequency) / (float)data->sampleRate;
-			auto wtPos = baseWtPos + wtPosMod * wtPosModSrc[i];
-			auto x = phase.advance(phaseStep);
-			// important to replace instead of add here
-			tmpPtr[i] = (data->wt)->getSample(exponent, wtPos, x) * 0.125f * velocity * env(i);
+			auto wtPos = juce::jlimit(0.f, 1.f, baseWtPos + wtPosMod * wtPosModSrc[start]);
+
+			auto scaledWtPos = wtPos * (wt.getNumChannels() - 1 - 1);
+			int channelIndex = static_cast<int>(scaledWtPos);
+			auto channelDelta = scaledWtPos - channelIndex;
+
+			auto channel0 = wt.getReadPointer(channelIndex);
+			auto channel1 = wt.getReadPointer(channelIndex + 1);
+
+			for (int i = start; i < end; i++) {
+
+				auto x = phase.advance(phaseStep);
+
+				auto scaledX = (x / juce::MathConstants<float>::twoPi) * (wt.getNumSamples() - 1);
+				int sampleIndex = static_cast<int>(scaledX);
+				auto xDelta = scaledX - sampleIndex;
+				auto sample0 = juce::jmap(xDelta, channel0[sampleIndex], channel0[sampleIndex + 1]);
+				auto sample1 = juce::jmap(xDelta, channel1[sampleIndex], channel1[sampleIndex + 1]);
+
+				auto sample = juce::jmap(channelDelta, sample0, sample1);
+
+				// important to replace instead of add here
+				tmpPtr[i] = sample;
+			}
+			// apply envelope, velocity and a multiplier so that more than one voice without reaching 0dB
+			auto multiplier = data->modParams[SharedData::ENV].isActive() ?
+				inputBlock.getSample((size_t)data->modParams[SharedData::ENV].src_channel, start)
+				: 1.f;
+			multiplier *= 0.125f * velocity;
+			workBuffers.getSingleChannelBlock(0).getSubBlock(start,end-start).multiplyBy(multiplier);
 		}
 
 		for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
 			outputBlock.getSingleChannelBlock(channel).add(workBuffers.getSingleChannelBlock(0));
+		}
+	};
+
+	void LFO::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
+	{
+		// TODO Use also wavetable!
+		auto& outputBlock = context.getOutputBlock();
+
+		float phaseStep = (juce::MathConstants<float>::twoPi * data->rate) / (float)data->sampleRate;
+		auto wtPos = data->wtPos;
+		for (int start = 0; start < workBuffers.getNumSamples(); start += configuration::MOD_BLOCK_SIZE) {
+			auto length = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples()) - start;
+			auto x = phase.advance(phaseStep*length);
+			auto value = juce::jmap(wtPos, data->wf0(x), data->wf1(x));
+			outputBlock.getSubBlock(start, length).add(value);
+		}
+	};
+
+
+	void Gain::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
+	{
+
+		if (context.isBypassed) {
+			return;
+		}
+
+		auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
+		auto& outputBlock = context.getOutputBlock();
+
+		auto workChannel = workBuffers.getSingleChannelBlock(0);
+		workChannel.replaceWithProductOf(
+			inputBlock.getSingleChannelBlock((int)data->modParams[SharedData::GAIN].src_channel), data->modParams[SharedData::GAIN].factor);
+		workChannel.add(data->gain);
+
+		for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
+			outputBlock.getSingleChannelBlock(channel).multiplyBy(workChannel);
 		}
 	};
 

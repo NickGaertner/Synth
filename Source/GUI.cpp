@@ -73,7 +73,7 @@ void customGui::SynthComponent::initModules(SynthAudioProcessor& audioProcessor)
 		oscModuleHolder.addModule(new OscModule(audioProcessor, i));
 	}
 	for (auto i = 0; i < configuration::FILTER_NUMBER; i++) {
-		filterModuleHolder.addModule(new SynthModule(audioProcessor, i));
+		filterModuleHolder.addModule(new FilterModule(audioProcessor, i));
 	}
 	for (auto i = 0; i < configuration::FX_NUMBER; i++) {
 		fxModuleHolder.addModule(new SynthModule(audioProcessor, i));
@@ -160,7 +160,7 @@ customGui::OscModule::OscModule(SynthAudioProcessor& audioProcessor, int id) :
 
 	buttonAttachments.add(new ButtonAttachment(apvts, prefix + configuration::BYPASSED_SUFFIX, powerAndName.powerButton));
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + configuration::WT_SUFFIX, dropDown)); 
-	dropDown.addItemList(wavetable::WavetableManager::getWavetableNames(),1);
+	dropDown.addItemList(dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(prefix + configuration::WT_SUFFIX))->choices, 1);
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::WT_POS_SUFFIX, wtPosKnob.slider));
 	sliderAttachments.add(new SliderAttachment(apvts,
@@ -193,6 +193,75 @@ customGui::OscModule::OscModule(SynthAudioProcessor& audioProcessor, int id) :
 		prefix + configuration::ENV_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		envChooser));
 	envChooser.addItemList(configuration::getModChannelNames(), 1);
+}
+
+customGui::FilterModule::FilterModule(SynthAudioProcessor& audioProcessor, int id) :
+	SynthModule(audioProcessor, id)
+{
+	juce::String prefix{ configuration::FILTER_PREFIX + juce::String(id) };
+
+	// LAYOUT
+	powerAndName.nameLabel.setText(juce::String(prefix), juce::NotificationType::dontSendNotification);
+
+	mainGrid.items.addArray({
+		juce::GridItem(cutoffKnob).withArea(Property(2), Property(1)),
+		juce::GridItem(cutoffModKnob).withArea(Property(3), Property(1)),
+		juce::GridItem(cutoffModSrcChooser).withArea(Property(4), Property(1)),
+
+		juce::GridItem(resonanceKnob).withArea(Property(2), Property(2)),
+		juce::GridItem(resonanceModKnob).withArea(Property(3), Property(2)),
+		juce::GridItem(resonanceModSrcChooser).withArea(Property(4), Property(2)),
+
+		juce::GridItem(driveKnob).withArea(Property(2), Property(3)),
+		juce::GridItem(driveModKnob).withArea(Property(3), Property(3)),
+		juce::GridItem(driveModSrcChooser).withArea(Property(4), Property(3)),
+		});
+
+	addAndMakeVisible(cutoffKnob);
+	addAndMakeVisible(cutoffModKnob);
+	addAndMakeVisible(cutoffModSrcChooser);
+
+	addAndMakeVisible(resonanceKnob);
+	addAndMakeVisible(resonanceModKnob);
+	addAndMakeVisible(resonanceModSrcChooser);
+
+	addAndMakeVisible(driveKnob);
+	addAndMakeVisible(driveModKnob);
+	addAndMakeVisible(driveModSrcChooser);
+
+	// VALUE TREE ATTACHMENTS
+	auto& apvts = audioProcessor.getApvts();
+
+	buttonAttachments.add(new ButtonAttachment(apvts, prefix + configuration::BYPASSED_SUFFIX, powerAndName.powerButton));
+	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + configuration::FILTER_TYPE_SUFFIX, dropDown));
+	dropDown.addItemList(dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(prefix + configuration::FILTER_TYPE_SUFFIX))->choices, 1);
+
+	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::CUTOFF_SUFFIX, cutoffKnob.slider));
+	sliderAttachments.add(new SliderAttachment(apvts,
+		prefix + configuration::CUTOFF_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
+		cutoffModKnob.slider));
+	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
+		prefix + configuration::CUTOFF_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
+		cutoffModSrcChooser));
+	cutoffModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
+
+	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::RESONANCE_SUFFIX, resonanceKnob.slider));
+	sliderAttachments.add(new SliderAttachment(apvts,
+		prefix + configuration::RESONANCE_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
+		resonanceModKnob.slider));
+	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
+		prefix + configuration::RESONANCE_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
+		resonanceModSrcChooser));
+	resonanceModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
+
+	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::DRIVE_SUFFIX, driveKnob.slider));
+	sliderAttachments.add(new SliderAttachment(apvts,
+		prefix + configuration::DRIVE_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
+		driveModKnob.slider));
+	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
+		prefix + configuration::DRIVE_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
+		driveModSrcChooser));
+	driveModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 }
 
 customGui::EnvModule::EnvModule(SynthAudioProcessor& audioProcessor, int id) :
@@ -259,3 +328,5 @@ customGui::LFOModule::LFOModule(SynthAudioProcessor& audioProcessor, int id)
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::RATE_SUFFIX, rateKnob.slider));
 	
 }
+
+

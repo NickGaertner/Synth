@@ -2,36 +2,18 @@
 #include "Wavetable.h"
 
 namespace wavetable {
-	// TODO let the oscs do all the logic since it should be much faster
-	float Wavetable::getSample(int exponent, float wtPos, float phase) const
-	{
-		jassert(0.f <= phase && phase <= juce::MathConstants<float>::twoPi);
-		jassert(-1.f <= wtPos && wtPos <= 2.f); // we can break the [0,1] limit with modulation
-		wtPos = std::clamp(wtPos, 0.f, 1.f);
-
-		auto& wt = getTable(exponent);
-
-		auto scaledWtPos = wtPos * (wt.getNumChannels() - 1 - 1);
-		int channelIndex = static_cast<int>(scaledWtPos);
-		auto channelDelta = scaledWtPos - channelIndex;
-
-		auto channel0 = wt.getReadPointer(channelIndex);
-		auto channel1 = wt.getReadPointer(channelIndex + 1);
-
-		auto scaledPhase = (phase / juce::MathConstants<float>::twoPi) * wtResolution;
-		int sampleIndex = static_cast<int>(scaledPhase);
-		auto phaseDelta = scaledPhase - sampleIndex;
-
-		auto sample0 = (1.f - phaseDelta) * channel0[sampleIndex] + (phaseDelta)*channel0[sampleIndex + 1];
-		auto sample1 = (1.f - phaseDelta) * channel1[sampleIndex] + (phaseDelta)*channel1[sampleIndex + 1];
-
-		return (1.f - channelDelta) * sample0 + channelDelta * sample1;
-	}
 
 	const juce::AudioBuffer<float>& Wavetable::getTable(int exponent) const
 	{
 		jassert(4 <= exponent && exponent <= 14);
 		return tables[exponent - 4];
+	}
+
+	const juce::AudioBuffer<float>& Wavetable::getTable(float frequency) const
+	{
+		int exponent;
+		std::frexpf(frequency, &exponent);
+		return getTable(exponent);
 	}
 
 	const juce::String& Wavetable::getName()
@@ -156,6 +138,14 @@ namespace wavetable {
 		return wavetableNames;
 	}
 
+	void WavetableManager::prepare(const juce::dsp::ProcessSpec& spec)
+	{
+		initAll();
+		for (auto wt : wavetables) {
+			wt->create(spec.sampleRate);
+		}
+	}
+
 	void WavetableManager::cleanUp()
 	{
 		wavetables.clear();
@@ -232,7 +222,7 @@ namespace wavetable {
 
 			// the second to last channel (62) has a saw wave with all available harmonics
 			auto sawChannel = saw->getTable(exponent).getReadPointer(62);
-			const float delta = 1;
+			const float delta = 2;
 			for (int i = 0; i < 63; i++) {
 				auto* channel = wt.getWritePointer(i);
 				// we dont want the case wtPosition = 0 since this would result in a constant wavefunction

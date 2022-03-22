@@ -10,6 +10,7 @@
 #include "PluginEditor.h"
 #include "Synth.h"
 #include "Wavetable.h"
+#include "Filter.h"
 //==============================================================================
 SynthAudioProcessor::SynthAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -24,7 +25,6 @@ SynthAudioProcessor::SynthAudioProcessor()
 #endif
 {
 	initSynths();
-
 }
 
 SynthAudioProcessor::~SynthAudioProcessor()
@@ -100,12 +100,18 @@ void SynthAudioProcessor::changeProgramName(int index, const juce::String& newNa
 //==============================================================================
 void SynthAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-
 	juce::dsp::ProcessSpec spec{ sampleRate, (juce::uint32)samplesPerBlock, (juce::uint32)getTotalNumOutputChannels() };
+	//wavetable::WavetableManager::prepare(spec);
 	for (auto& synth : synths)
 	{
 		synth.prepare(spec);
 	}
+	for (auto synthPos = 0; synthPos < configuration::OSC_NUMBER; synthPos++)
+	{
+		auto prefix = configuration::OSC_PREFIX + std::to_string(synthPos)+configuration::WT_SUFFIX;
+		apvts.getParameter(prefix)->sendValueChangedMessageToListeners(0);
+	}
+
 }
 
 void SynthAudioProcessor::releaseResources()
@@ -143,15 +149,14 @@ bool SynthAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) con
 
 void SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
+	performanceCounter.start();
 	juce::ScopedNoDenormals noDenormals;
-	//auto totalNumInputChannels = getTotalNumInputChannels();
-	//auto totalNumOutputChannels = getTotalNumOutputChannels();
 
-	updateSettings();
 	buffer.clear();
 	for (auto& synth : synths) {
 		synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
 	}
+	performanceCounter.stop();
 }
 
 //==============================================================================
@@ -162,7 +167,7 @@ bool SynthAudioProcessor::hasEditor() const
 
 juce::AudioProcessorEditor* SynthAudioProcessor::createEditor()
 {
-	return new SynthAudioProcessorEditor (*this);
+	return new SynthAudioProcessorEditor(*this);
 	//return new juce::GenericAudioProcessorEditor(*this);
 }
 
@@ -215,6 +220,14 @@ void SynthAudioProcessor::initSynths()
 
 		synth.addSound(new Synth::SynthSound{});
 	}
+
+
+	for (auto& dataArray : processorData) {
+		std::for_each(dataArray.begin(), dataArray.end(),
+			[&](customDsp::Processor::SharedData* data) {
+				data->registerAsListener(apvts);
+			});
+	}
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout SynthAudioProcessor::createParameterDataAndLayout()
@@ -233,7 +246,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SynthAudioProcessor::createP
 	// Create Processor::SharedData for the synth independent processors in the right order
 	for (auto i = 0; i < configuration::FILTER_NUMBER; i++) {
 		auto prefix = configuration::FILTER_PREFIX + std::to_string(i);
-		processorData[configuration::OSC_NUMBER].add(new customDsp::DummyProcessor::SharedData{ prefix });
+		processorData[configuration::OSC_NUMBER].add(new customDsp::FilterChooser::SharedData{ prefix });
 	}
 
 	for (auto i = 0; i < configuration::FX_NUMBER; i++) {
@@ -241,7 +254,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SynthAudioProcessor::createP
 		processorData[configuration::OSC_NUMBER].add(new customDsp::DummyProcessor::SharedData{ prefix });
 	}
 
-	processorData[configuration::OSC_NUMBER].add(new customDsp::DummyProcessor::SharedData{configuration::PAN_PREFIX});
+	processorData[configuration::OSC_NUMBER].add(new customDsp::DummyProcessor::SharedData{ configuration::PAN_PREFIX });
 
 	// Create Processor::SharedData for the modulation processors in the right order
 	for (auto i = 0; i < configuration::ENV_NUMBER; i++) {
@@ -270,19 +283,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout SynthAudioProcessor::createP
 	return layout;
 }
 
-void SynthAudioProcessor::updateSettings()
-{
-	for (auto& dataArray : processorData) {
-		std::for_each(dataArray.begin(), dataArray.end(),
-			[&](customDsp::Processor::SharedData* data) {
-				data->updateParams(apvts);
-			});
-	}
-}
-
 //==============================================================================
 // This creates new instances of the plugin..
 juce::AudioProcessor* JUCE_CALLTYPE createPluginFilter()
 {
 	return new SynthAudioProcessor();
 }
+
+

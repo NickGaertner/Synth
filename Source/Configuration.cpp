@@ -9,7 +9,10 @@ namespace configuration {
 	const int ENV_NUMBER = 2; // 2
 	const int LFO_NUMBER = 2; // 2
 
+	const int MOD_BLOCK_SIZE = 128;
+
 	const int EMPTY_MOD_CHANNEL = ENV_NUMBER + LFO_NUMBER;
+
 	const juce::StringArray& getModChannelNames() {
 		static juce::StringArray array;
 		if (!array.isEmpty()) {
@@ -48,4 +51,10 @@ namespace configuration {
 	const juce::String SUSTAIN_SUFFIX{"::SUSTAIN"};
 	const juce::String RELEASE_SUFFIX{"::RELEASE"};
 	const juce::String RATE_SUFFIX{"::RATE"};
+	const juce::String MODE_SUFFIX{"::MODE"};
+	const juce::String CUTOFF_SUFFIX{"::CUTOFF"};
+	const juce::String RESONANCE_SUFFIX{"::RES"};
+	const juce::String DRIVE_SUFFIX{"::DRIVE"};
+	const juce::String FILTER_TYPE_SUFFIX{"::FILTER_TYPE"};
+
 }

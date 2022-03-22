@@ -10,6 +10,8 @@ namespace configuration {
 	extern const int ENV_NUMBER;
 	extern const int LFO_NUMBER;
 
+	extern const int MOD_BLOCK_SIZE;
+
 	extern const int EMPTY_MOD_CHANNEL;
 
 	const juce::StringArray& getModChannelNames();
@@ -37,5 +39,10 @@ namespace configuration {
 	extern const juce::String SUSTAIN_SUFFIX;
 	extern const juce::String RELEASE_SUFFIX;
 	extern const juce::String RATE_SUFFIX;
+	extern const juce::String MODE_SUFFIX;
+	extern const juce::String CUTOFF_SUFFIX;
+	extern const juce::String RESONANCE_SUFFIX;
+	extern const juce::String DRIVE_SUFFIX;
+	extern const juce::String FILTER_TYPE_SUFFIX;
 
 }
