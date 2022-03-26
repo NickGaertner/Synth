@@ -2,16 +2,26 @@
 #pragma once
 
 #include <JuceHeader.h>
+#include "Configuration.h"
 
 namespace wavetable {
 
-	class Wavetable {
-	public:
-		Wavetable(const juce::String& t_name) : name(t_name) {};
-		virtual ~Wavetable(){}
 
-		//needs to be called before getTable() is used and should be idempotent with the same sampleRate
-		virtual void create(double sampleRate) = 0;
+	// Wavetables as data:
+	// 4 Byte (int) for number of channels per table
+	// 4 Byte (int) for wtResolution
+	// then just the 11 wavetables one after another starting with low frequency tables 
+	// and ending with the highest, going from first to last channel
+	// empty channels and values at the end, which we use at runtime, won't be safed to disk and will be appended, when reading from disk
+
+	class Wavetable : public juce::ReferenceCountedObject {
+	public:
+		using Ptr = juce::ReferenceCountedObjectPtr<Wavetable>;
+		Wavetable() = delete;
+		Wavetable(const juce::String& t_name, const juce::MemoryBlock& waveData);
+		virtual ~Wavetable() {}
+
+		void toMemoryBlock(juce::MemoryBlock& blockToFill) const;
 
 		const juce::AudioBuffer<float>& getTable(int exponent) const;
 		const juce::AudioBuffer<float>& getTable(float frequency) const;
@@ -19,23 +29,25 @@ namespace wavetable {
 		const juce::String& getName();
 
 	protected:
+		Wavetable(const juce::String& t_name) : name(t_name) {
+		}
 		juce::String name;
-		double oldSampleRate = 0.0;
+
 		static int getMaxHarmonics(double sampleRate);
 		void createFromHarmonicWeights(double sampleRate, const juce::Array<double>& weights);
-		
+
 		// idempotent with same sampleRate
 		static void updateSineValues(double sampleRate);
 		inline static juce::AudioBuffer<double> sineValues;
 
 		// number of samples for one cycle
-		static const int wtResolution = 2048-1;
+		static const int defaultWtResolution = 2048 - 1;
 
 		// tables[i] holds the wavetable for frequencies f with 2^(i+4) < f <= 2^(i+5)
 		// (for lower frequencies we have more and higher harmonics)
 		// each channel represents one cycle for a fixed wtPosition with (wtResolution + 1) samples
-		// last sample == first sample to simplify getSample()
-		// each wavetable can have a different number of channels, but the last one will not be used; again to simplify get Sample()
+		// last sample == first sample to simplify calculations
+		// each wavetable can have a different number of channels, but the last one will not be used; again to simplify calculations
 		// I will go with 63+1 channels
 		juce::AudioBuffer<float> tables[11];
 
@@ -44,35 +56,65 @@ namespace wavetable {
 	};
 
 
-	// TODO load wavetables from files
-	class WavetableManager {
+	class WavetableCache : private juce::DeletedAtShutdown {
 	public:
-		enum {
-			SAW_HARMONICS,
-			SQUARE_HARMONICS,
-			TRIANGLE_HARMONICS,
-			PWM,
-			TRAPEZ,
+		WavetableCache();
+		~WavetableCache() override { clearSingletonInstance(); }
 
-			NUMBER_OF_WT
-		};
-		WavetableManager() = delete;
-		// idempotent
-		static void initAll();
-		static const Wavetable* getWavetable(int index, double sampleRate);
-		static const juce::StringArray& getWavetableNames();
-		static void prepare(const juce::dsp::ProcessSpec& spec);
-		static void cleanUp();
+		JUCE_DECLARE_SINGLETON(WavetableCache, true);
+
+		Wavetable::Ptr getWavetable(int nameIndex) {
+			return getWavetable(wavetableNames[nameIndex]);
+		}
+
+		Wavetable::Ptr getWavetable(const juce::String& wtName);
+
+		const juce::StringArray& getWavetableNames() {
+			return wavetableNames;
+		}
+
 	private:
-		inline static juce::OwnedArray<Wavetable> wavetables;
-		inline static juce::StringArray wavetableNames;
+
+		void deleteUnused() {
+			for (auto wtPtr : wavetables) {
+				if (wtPtr->getReferenceCount() == 1) {
+					wavetables.removeObject(wtPtr);
+				}
+			}
+		};
+
+		std::unique_ptr<juce::File> wtFolder;
+		juce::StringArray wavetableNames;
+
+		juce::ReferenceCountedArray<Wavetable, juce::CriticalSection> wavetables;
+
+		enum class GeneratableWt {
+			SawHarmonics,
+			TriangleHarmonics,
+			SquareHarmonics,
+			PWM,
+			Trapez,
+			TotalNumber,
+		};
+		const juce::StringArray GENERATABLE_WT_NAMES{
+			"SawHarmonics",
+			"TriangleHarmonics",
+			"SquareHarmonics",
+			"PWM",
+			"Trapez",
+		};
+
+		JUCE_DECLARE_NON_COPYABLE(WavetableCache)
 	};
+
+	// TODO maybe make these static function
 
 	class SawHarmonicsWavetable : public Wavetable {
 	public:
-		SawHarmonicsWavetable() : Wavetable("SawHarmonics") {};
-
-		virtual void create(double sampleRate) override;
+		SawHarmonicsWavetable(const juce::String& t_name, double sampleRate) : Wavetable(t_name) {
+			create(sampleRate);
+		}
+		virtual void create(double sampleRate);
 
 	private:
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SawHarmonicsWavetable)
@@ -80,9 +122,10 @@ namespace wavetable {
 
 	class SquareHarmonicsWavetable : public Wavetable {
 	public:
-		SquareHarmonicsWavetable() : Wavetable("SquareHarmonics") {};
-
-		virtual void create(double sampleRate) override;
+		SquareHarmonicsWavetable(const juce::String& t_name, double sampleRate) : Wavetable(t_name) {
+			create(sampleRate);
+		}
+		virtual void create(double sampleRate);
 
 	private:
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SquareHarmonicsWavetable)
@@ -90,9 +133,10 @@ namespace wavetable {
 
 	class TriangleHarmonicsWavetable : public Wavetable {
 	public:
-		TriangleHarmonicsWavetable() : Wavetable("TriangleHarmonics") {};
-
-		virtual void create(double sampleRate) override;
+		TriangleHarmonicsWavetable(const juce::String& t_name, double sampleRate) : Wavetable(t_name) {
+			create(sampleRate);
+		}
+		virtual void create(double sampleRate);
 
 	private:
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TriangleHarmonicsWavetable)
@@ -101,9 +145,10 @@ namespace wavetable {
 	// for a period of P with wtPosition t: pwm(x) = saw(x) - saw(x+t*P/2) + (t-1)
 	class PWMWavetable : public Wavetable {
 	public:
-		PWMWavetable() : Wavetable("PWM") {};
-
-		virtual void create(double sampleRate) override;
+		PWMWavetable(const juce::String& t_name, double sampleRate) : Wavetable(t_name) {
+			create(sampleRate);
+		}
+		virtual void create(double sampleRate);
 
 	private:
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PWMWavetable)
@@ -112,9 +157,10 @@ namespace wavetable {
 	// for a period of P with wtPosition t: trapez(x) = (triangle(x) + triangle(x+t*P/2))/(2*(t-1))
 	class TrapezWavetable : public Wavetable {
 	public:
-		TrapezWavetable() : Wavetable("Trapez(Tri->Square)") {};
-
-		virtual void create(double sampleRate) override;
+		TrapezWavetable(const juce::String& t_name, double sampleRate) : Wavetable(t_name) {
+			create(sampleRate);
+		}
+		virtual void create(double sampleRate);
 
 	private:
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TrapezWavetable)

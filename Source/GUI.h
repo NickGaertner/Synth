@@ -283,6 +283,34 @@ namespace customGui {
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FilterModule)
 	};
 
+	class FXModule : public SynthModule {
+	public:
+		FXModule() = delete;
+		FXModule(SynthAudioProcessor& audioProcessor, int id);
+		virtual ~FXModule() override {}
+
+	protected:
+		NamedKnob dryWetKnob{ "Dry-Wet" };
+		NamedKnob dryWetModKnob{ "Mod" };
+		ModSrcChooser dryWetModSrcChooser;
+
+		NamedKnob parameter0Knob{ "Parameter 0" };
+		NamedKnob parameter0ModKnob{ "Mod" };
+		ModSrcChooser parameter0ModSrcChooser;
+
+		NamedKnob parameter1Knob{ "Parameter 1" };
+		NamedKnob parameter1ModKnob{ "Mod" };
+		ModSrcChooser parameter1ModSrcChooser;
+
+		NamedKnob parameter2Knob{ "Parameter 2" };
+		NamedKnob parameter2ModKnob{ "Mod" };
+		ModSrcChooser parameter2ModSrcChooser;
+
+	private:
+
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FXModule)
+	};
+
 	class EnvModule : public SynthModule {
 	public:
 		EnvModule() = delete;
@@ -290,10 +318,10 @@ namespace customGui {
 		virtual ~EnvModule() override {}
 
 	protected:
-		NamedKnob attackKnob{ "Attack"};
-		NamedKnob decayKnob{ "Decay"};
-		NamedKnob sustainKnob{ "Sustain"};
-		NamedKnob releaseKnob{ "Release"};
+		NamedKnob attackKnob{ "Attack" };
+		NamedKnob decayKnob{ "Decay" };
+		NamedKnob sustainKnob{ "Sustain" };
+		NamedKnob releaseKnob{ "Release" };
 
 	private:
 

@@ -14,10 +14,16 @@ namespace Synth {
 
 	void SynthVoice::prepare(const juce::dsp::ProcessSpec& spec)
 	{
-		tmpAudioBlock = juce::dsp::AudioBlock<float>(heapBlock, 
-			spec.numChannels + modulationProcessors.size() + customDsp::WORK_BUFFERS + 1, // + 1 for empty channel
+		tmpAudioBlock = juce::dsp::AudioBlock<float>(heapBlock,
+			spec.numChannels
+			+ modulationProcessors.size()
+			+ customDsp::WORK_BUFFERS + 1, // + 1 for empty channel
 			spec.maximumBlockSize);
-		processorChain.prepare(spec);
+		for (auto& p : oscChains) {
+			p.prepare(spec);
+		}
+		monoChain.prepare(spec);
+		stereoChain.prepare(spec);
 		modulationProcessors.prepare(spec);
 	}
 
@@ -29,27 +35,28 @@ namespace Synth {
 	void SynthVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* t_sound, int currentPitchWheelPosition)
 	{
 		juce::ignoreUnused(t_sound, currentPitchWheelPosition);
-
-		// OSC
-		auto osc = dynamic_cast<customDsp::InterpolationOsc*>(processorChain.getProcessor(0));
-		osc->setFrequency((float)juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber), true);
-		osc->setVelocity(velocity);
-
-		// ENV & LFO
+		for (auto& p : oscChains) {
+			auto osc = dynamic_cast<customDsp::InterpolationOsc*>(p.getProcessor(0));
+			osc->setFrequency((float)juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber), true);
+			osc->setVelocity(velocity);
+			p.noteOn();
+		}
+		monoChain.noteOn();
+		stereoChain.noteOn();
 		modulationProcessors.noteOn();
 	}
 
 	void SynthVoice::stopNote(float velocity, bool allowTailOff)
 	{
 		juce::ignoreUnused(velocity);
-		auto* osc = dynamic_cast<customDsp::InterpolationOsc*>(processorChain.getProcessor(0));
-		if (!allowTailOff || osc->getEnvChannel() == configuration::EMPTY_MOD_CHANNEL) {
-			clearCurrentNote();
-			processorChain.reset();
-			modulationProcessors.reset();
+		for (auto& p : oscChains) {
+			p.noteOff();
 		}
-		else {
-			modulationProcessors.noteOff();
+		monoChain.noteOff();
+		stereoChain.noteOff();
+		modulationProcessors.noteOff();
+		if (!allowTailOff) {
+			reset();
 		}
 	}
 
@@ -64,45 +71,72 @@ namespace Synth {
 	}
 
 	void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples)
-	{	
+	{
 		if (!isVoiceActive()) {
 			return;
 		}
-		// check if we might exited the release phase of our possible adsr and stop the note if necessary
-		auto osc = dynamic_cast<customDsp::InterpolationOsc*>(processorChain.getProcessor(0));
-		if (osc->getEnvChannel() != configuration::EMPTY_MOD_CHANNEL) {
-			auto env = dynamic_cast<customDsp::Envelope*>(modulationProcessors.getProcessor(osc->getEnvChannel()));
-			if (env->isIdle()) {
-				stopNote(0.f, false);
-				return;
-			}
-		}
+
+		auto numChannels = outputBuffer.getNumChannels();
 
 		// prepare temporary AudioBlocks to be used as buffers
-		auto outputBlock = tmpAudioBlock.getSubsetChannelBlock(0, outputBuffer.getNumChannels())
+		auto outputBlock = tmpAudioBlock.getSubsetChannelBlock(0, numChannels)
 			.getSubBlock(0, numSamples);
 		outputBlock.clear();
+		auto monoBlock = outputBlock.getSingleChannelBlock(0);
+		auto tmpMonoBlock = outputBlock.getSingleChannelBlock(1);
 
-		auto workBlock = tmpAudioBlock.getSubsetChannelBlock(outputBuffer.getNumChannels(), customDsp::WORK_BUFFERS)
+		auto workBlock = tmpAudioBlock.getSubsetChannelBlock(numChannels , customDsp::WORK_BUFFERS)
 			.getSubBlock(0, numSamples);
 		workBlock.clear();
 
-		auto inputBlock = tmpAudioBlock.getSubsetChannelBlock(outputBuffer.getNumChannels() + customDsp::WORK_BUFFERS,
+		auto inputBlock = tmpAudioBlock.getSubsetChannelBlock(numChannels + customDsp::WORK_BUFFERS,
 			modulationProcessors.size() + 1)
 			.getSubBlock(0, numSamples);;
 		inputBlock.clear();
 
-		// fill inputBlock with modulation signals
 		juce::dsp::ProcessContextNonReplacing<float> modulationContext{ juce::dsp::AudioBlock<float>{},inputBlock };
-		modulationProcessors.process(modulationContext, workBlock);
+		juce::dsp::ProcessContextNonReplacing<float> oscContext{ inputBlock, tmpMonoBlock};
+		juce::dsp::ProcessContextNonReplacing<float> monoContext{ inputBlock, monoBlock};
+		juce::dsp::ProcessContextNonReplacing<float> stereoContext{ inputBlock, outputBlock };
+		
+		// fill inputBlock with modulation signals
+		bool needMoreTime = modulationProcessors.process(modulationContext, workBlock);
 
-		// process with processChain on temporary blocks
-		juce::dsp::ProcessContextNonReplacing<float> processContext{ inputBlock, outputBlock };
-		processorChain.process(processContext, workBlock);
+		// process oscillators and add results to next context
+		for (auto& p : oscChains) {
+			needMoreTime |= p.process(oscContext, workBlock);
+			monoBlock.add(tmpMonoBlock);
+			tmpMonoBlock.clear();
+		}
+
+		// process mono stuff (filters)
+		needMoreTime |= monoChain.process(monoContext, workBlock);
+		
+		// copy the mono signal to all other channels (which should only be one)
+		for (int channel = 1; channel < numChannels; channel++) {
+			outputBlock.getSingleChannelBlock(channel).copyFrom(monoBlock);
+		}
+		// process stereo stuff (fx)
+		needMoreTime |= stereoChain.process(stereoContext, workBlock);
 
 		// add result from temporary block to the output buffer
 		juce::dsp::AudioBlock<float>{outputBuffer}.getSubBlock((size_t)startSample, (size_t)numSamples)
-			.add(outputBlock.getSubsetChannelBlock(0, outputBuffer.getNumChannels()));
+			.add(outputBlock.getSubsetChannelBlock(0, numChannels));
+
+		if (!needMoreTime) {
+			reset();
+		}
+	}
+
+	void SynthVoice::reset()
+	{
+		for (auto& p : oscChains) {
+			p.reset();
+		}
+		monoChain.reset();
+		stereoChain.reset();
+		modulationProcessors.reset();
+		clearCurrentNote();
 	}
 
 	//

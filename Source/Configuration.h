@@ -45,5 +45,14 @@ namespace configuration {
 	extern const juce::String DRIVE_SUFFIX;
 	extern const juce::String SPECIAL_SUFFIX;
 	extern const juce::String FILTER_TYPE_SUFFIX;
+	extern const juce::String FX_TYPE_SUFFIX;
+	extern const juce::String DRY_WET_SUFFIX;
+	extern const juce::String PARAMETER_0_SUFFIX;
+	extern const juce::String PARAMETER_1_SUFFIX;
+	extern const juce::String PARAMETER_2_SUFFIX;
+
+	extern const juce::String WT_FOLDER_NAME;
+	extern const juce::String WT_FILE_EXTENSION;
+	extern const int MAX_TABLES_IN_MEM;
 
 }

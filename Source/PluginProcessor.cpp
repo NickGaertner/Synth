@@ -11,6 +11,8 @@
 #include "Synth.h"
 #include "Wavetable.h"
 #include "Filter.h"
+#include "FX.h"
+
 //==============================================================================
 SynthAudioProcessor::SynthAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -29,7 +31,6 @@ SynthAudioProcessor::SynthAudioProcessor()
 
 SynthAudioProcessor::~SynthAudioProcessor()
 {
-	wavetable::WavetableManager::cleanUp();
 }
 
 //==============================================================================
@@ -101,14 +102,12 @@ void SynthAudioProcessor::changeProgramName(int index, const juce::String& newNa
 void SynthAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
 	juce::dsp::ProcessSpec spec{ sampleRate, (juce::uint32)samplesPerBlock, (juce::uint32)getTotalNumOutputChannels() };
-	//wavetable::WavetableManager::prepare(spec);
-	for (auto& synth : synths)
+
+	synth.prepare(spec);
+
+	for (auto i = 0; i < configuration::OSC_NUMBER; i++)
 	{
-		synth.prepare(spec);
-	}
-	for (auto synthPos = 0; synthPos < configuration::OSC_NUMBER; synthPos++)
-	{
-		auto prefix = configuration::OSC_PREFIX + std::to_string(synthPos)+configuration::WT_SUFFIX;
+		auto prefix = configuration::OSC_PREFIX + std::to_string(i) + configuration::WT_SUFFIX;
 		apvts.getParameter(prefix)->sendValueChangedMessageToListeners(0);
 	}
 	for (auto lfoPos = 0; lfoPos < configuration::LFO_NUMBER; lfoPos++)
@@ -157,9 +156,9 @@ void SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 	juce::ScopedNoDenormals noDenormals;
 
 	buffer.clear();
-	for (auto& synth : synths) {
-		synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
-	}
+
+	synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+
 	performanceCounter.stop();
 }
 
@@ -194,37 +193,40 @@ void SynthAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 void SynthAudioProcessor::initSynths()
 {
 	// Init each synth with 'POLYPHONY' voices and one sound
-	for (auto synthPos = 0; synthPos < std::size(synths); synthPos++)
-	{
-		auto& synth = synths[synthPos];
+	for (auto i = 0; i < configuration::POLYPHONY; i++) {
+		// add processors to each voice's processorChain and modulationProcessors
+		auto voice = new Synth::SynthVoice{};
 
-		for (auto i = 0; i < configuration::POLYPHONY; i++) {
-			// add processors to each voice's processorChain and modulationProcessors
-			auto voice = new Synth::SynthVoice{};
-
-			// synth specific
-			std::for_each(processorData[synthPos].begin(), processorData[synthPos].end(),
+		// osc
+		for (int j = 0; j < configuration::OSC_NUMBER; j++) {
+			std::for_each(processorData[j].begin(), processorData[j].end(),
 				[&](customDsp::Processor::SharedData* data) {
-					voice->processorChain.addProcessor(data->createProcessor());
+					voice->oscChains[j].addProcessor(data->createProcessor());
 				});
-
-			// synth independent
-			std::for_each(processorData[configuration::OSC_NUMBER].begin(), processorData[configuration::OSC_NUMBER].end(),
-				[&](customDsp::Processor::SharedData* data) {
-					voice->processorChain.addProcessor(data->createProcessor());
-				});
-
-			// modulation
-			std::for_each(processorData[configuration::OSC_NUMBER + 1].begin(), processorData[configuration::OSC_NUMBER + 1].end(),
-				[&](customDsp::Processor::SharedData* data) {
-					voice->modulationProcessors.addProcessor(data->createProcessor());
-				});
-			synth.addVoice(voice);
 		}
 
-		synth.addSound(new Synth::SynthSound{});
+		// filter
+		std::for_each(processorData[configuration::OSC_NUMBER].begin(), processorData[configuration::OSC_NUMBER].end(),
+			[&](customDsp::Processor::SharedData* data) {
+				voice->monoChain.addProcessor(data->createProcessor());
+			});
+
+		// fx
+		std::for_each(processorData[configuration::OSC_NUMBER + 1].begin(), processorData[configuration::OSC_NUMBER + 1].end(),
+			[&](customDsp::Processor::SharedData* data) {
+				voice->stereoChain.addProcessor(data->createProcessor());
+			});
+
+		// modulation
+		std::for_each(processorData[configuration::OSC_NUMBER + 3].begin(), processorData[configuration::OSC_NUMBER + 3].end(),
+			[&](customDsp::Processor::SharedData* data) {
+				voice->modulationProcessors.addProcessor(data->createProcessor());
+			});
+
+		synth.addVoice(voice);
 	}
 
+	synth.addSound(new Synth::SynthSound{});
 
 	for (auto& dataArray : processorData) {
 		std::for_each(dataArray.begin(), dataArray.end(),
@@ -239,12 +241,11 @@ juce::AudioProcessorValueTreeState::ParameterLayout SynthAudioProcessor::createP
 	// DATA
 
 	// Create Processor::SharedData for the synth specific processors in the right order
-	for (auto synthPos = 0; synthPos < configuration::OSC_NUMBER; synthPos++)
+	for (auto i = 0; i < configuration::OSC_NUMBER; i++)
 	{
-		auto prefix = configuration::OSC_PREFIX + std::to_string(synthPos);
-		processorData[synthPos].add(new customDsp::InterpolationOsc::SharedData{ prefix });
-		processorData[synthPos].add(new customDsp::Gain::SharedData{ prefix });
-
+		auto prefix = configuration::OSC_PREFIX + std::to_string(i);
+		processorData[i].add(new customDsp::InterpolationOsc::SharedData{ prefix });
+		processorData[i].add(new customDsp::Gain::SharedData{ prefix });
 	}
 
 	// Create Processor::SharedData for the synth independent processors in the right order
@@ -255,23 +256,23 @@ juce::AudioProcessorValueTreeState::ParameterLayout SynthAudioProcessor::createP
 
 	for (auto i = 0; i < configuration::FX_NUMBER; i++) {
 		auto prefix = configuration::FX_PREFIX + std::to_string(i);
-		processorData[configuration::OSC_NUMBER].add(new customDsp::DummyProcessor::SharedData{ prefix });
+		processorData[configuration::OSC_NUMBER + 1].add(new customDsp::FXChooser::SharedData{ prefix });
 	}
 
-	processorData[configuration::OSC_NUMBER].add(new customDsp::DummyProcessor::SharedData{ configuration::PAN_PREFIX });
+	processorData[configuration::OSC_NUMBER + 2].add(new customDsp::DummyProcessor::SharedData{ configuration::PAN_PREFIX });
+
+	// TODO Master? (it's independant of the synths)
 
 	// Create Processor::SharedData for the modulation processors in the right order
 	for (auto i = 0; i < configuration::ENV_NUMBER; i++) {
 		auto prefix = configuration::ENV_PREFIX + std::to_string(i);
-		processorData[configuration::OSC_NUMBER + 1].add(new customDsp::Envelope::SharedData{ prefix });
+		processorData[configuration::OSC_NUMBER + 3].add(new customDsp::Envelope::SharedData{ prefix });
 	}
 
 	for (auto i = 0; i < configuration::LFO_NUMBER; i++) {
 		auto prefix = configuration::LFO_PREFIX + std::to_string(i);
-		processorData[configuration::OSC_NUMBER + 1].add(new customDsp::LFO::SharedData{ prefix });
+		processorData[configuration::OSC_NUMBER + 3].add(new customDsp::LFO::SharedData{ prefix });
 	}
-
-	// TODO Master? (it's independant of the synths)
 
 	// LAYOUT
 

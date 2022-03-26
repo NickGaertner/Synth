@@ -30,7 +30,11 @@ namespace Synth
 		virtual void controllerMoved(int controllerNumber, int newControllerValue) override;
 		virtual void renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int startSample, int numSamples) override;
 
-		customDsp::ProcessorChain processorChain;
+		void reset();
+
+		std::vector<customDsp::ProcessorChain> oscChains{ configuration::OSC_NUMBER };
+		customDsp::ProcessorChain monoChain;
+		customDsp::ProcessorChain stereoChain;
 		customDsp::SplitProcessor modulationProcessors;
 
 	private:

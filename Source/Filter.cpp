@@ -10,11 +10,28 @@ void customDsp::FilterChooser::createFilter(FilterType type) {
 	}
 
 	filter->prepareUpdate();
+	if (isNoteOn) {
+		filter->noteOn();
+	}
+}
+
+void customDsp::FilterChooser::noteOn() {
+	Processor::noteOn();
+	if (filter) {
+		filter->noteOn();
+	}
+}
+
+void customDsp::FilterChooser::noteOff() {
+	Processor::noteOff();
+	if (filter) {
+		filter->noteOff();
+	}
 }
 
 void customDsp::FilterChooser::prepare(const juce::dsp::ProcessSpec& spec) {
 	data->sampleRate = spec.sampleRate;
-	data->numberOfChannels = spec.numChannels;
+	data->numChannels = spec.numChannels;
 	createFilter(data->filterType);
 }
 
@@ -24,10 +41,10 @@ void customDsp::FilterChooser::reset() {
 	}
 }
 
-void customDsp::FilterChooser::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
+bool customDsp::FilterChooser::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
 {
 	if (data->bypassed || context.isBypassed) {
-		return;
+		return false;
 	}
 	if (data->filterType != filter->mode) {
 		if (!isSameFilter(data->filterType, filter->mode)) {
@@ -37,13 +54,13 @@ void customDsp::FilterChooser::process(juce::dsp::ProcessContextNonReplacing<flo
 			filter->updateMode();
 		}
 	}
-	filter->process(context, workBuffers);
+	return filter->process(context, workBuffers);
 };
 
 void customDsp::TPTFilter::prepareUpdate() {
-	if (data->numberOfChannels > 0) {
-		s1.resize(data->numberOfChannels);
-		s2.resize(data->numberOfChannels);
+	if (data->numChannels > 0) {
+		s1.resize(data->numChannels);
+		s2.resize(data->numChannels);
 		updateMode();
 		reset();
 	}
@@ -59,10 +76,10 @@ void customDsp::TPTFilter::updateMode() {
 	mode = data->filterType;
 }
 
-void customDsp::TPTFilter::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) {
+bool customDsp::TPTFilter::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) {
 
 	if (data->bypassed || context.isBypassed) {
-		return;
+		return false;
 	}
 
 	auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
@@ -80,7 +97,7 @@ void customDsp::TPTFilter::process(juce::dsp::ProcessContextNonReplacing<float>&
 
 		auto end = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples());
 
-		auto currentCutoff = juce::jmap(juce::jlimit(0.f,1.f,cutoffBase + cutoffMod * cutoffModSrc[start]), 100.f, 1900.f);
+		auto currentCutoff = juce::jmap(juce::jlimit(0.f, 1.f, cutoffBase + cutoffMod * cutoffModSrc[start]), 100.f, 18000.f);
 		float g = juce::dsp::FastMathApproximations::tan(juce::MathConstants<float>::pi * currentCutoff / data->sampleRate);
 
 		auto currentResonance = juce::jmap(juce::jlimit(0.f, 1.f, resonanceBase + resonanceMod * resonanceModSrc[start]), 0.1f, 2.f);
@@ -118,4 +135,5 @@ void customDsp::TPTFilter::process(juce::dsp::ProcessContextNonReplacing<float>&
 		}
 	}
 	snapToZero();
+	return isNoteOn;
 }

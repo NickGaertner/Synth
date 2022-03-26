@@ -57,5 +57,14 @@ namespace configuration {
 	const juce::String DRIVE_SUFFIX{"::DRIVE"};
 	const juce::String SPECIAL_SUFFIX{"::SPECIAL"};
 	const juce::String FILTER_TYPE_SUFFIX{"::FILTER_TYPE"};
+	const juce::String FX_TYPE_SUFFIX{"::FX_TYPE"};
+	const juce::String DRY_WET_SUFFIX{"::DRY_WET"};
+	const juce::String PARAMETER_0_SUFFIX{"::PARAMETER_0"};
+	const juce::String PARAMETER_1_SUFFIX{ "::PARAMETER_1" };
+	const juce::String PARAMETER_2_SUFFIX{ "::PARAMETER_2" };
+
+	const juce::String WT_FOLDER_NAME{"wavetables"};
+	const juce::String WT_FILE_EXTENSION{".wt"};
+	extern const int MAX_TABLES_IN_MEM{2};
 
 }

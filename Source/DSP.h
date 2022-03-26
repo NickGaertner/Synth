@@ -45,11 +45,6 @@ namespace customDsp {
 				src_channel));
 		}
 
-		//void updateModParams(const juce::AudioProcessorValueTreeState& apvts, const juce::String& name) {
-		//	factor = apvts.getRawParameterValue(name + configuration::MOD_FACTOR_SUFFIX)->load();
-		//	src_channel = (int)apvts.getRawParameterValue(name + configuration::MOD_CHANNEL_SUFFIX)->load();
-		//}
-
 		void registerAsListener(juce::AudioProcessorValueTreeState& apvts, const juce::String& name) {
 			apvts.addParameterListener(name + configuration::MOD_CHANNEL_SUFFIX, this);
 			apvts.addParameterListener(name + configuration::MOD_FACTOR_SUFFIX, this);
@@ -96,12 +91,20 @@ namespace customDsp {
 
 		virtual void reset() = 0;
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>&, juce::dsp::AudioBlock<float>&) = 0;
+		// returns wether the processor still needs more time
+		// this is useful for effects like reverbs
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>&, juce::dsp::AudioBlock<float>&) = 0;
 
-		virtual void noteOn() {};
+		virtual void noteOn() {
+			isNoteOn = true;
+		};
 
-		virtual void noteOff() {};
+		virtual void noteOff() {
+			isNoteOn = false;
+		};
 
+	protected:
+		bool isNoteOn = false;
 	private:
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Processor)
 	};
@@ -115,10 +118,6 @@ namespace customDsp {
 			virtual DummyProcessor* createProcessor() override {
 				return new DummyProcessor(this);
 			};
-
-			//virtual void updateParams(const juce::AudioProcessorValueTreeState& apvts) override {
-			//	juce::ignoreUnused(apvts);
-			//}
 
 			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
 				juce::ignoreUnused(layout);
@@ -148,8 +147,9 @@ namespace customDsp {
 		virtual void reset() override {
 		}
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
 			juce::ignoreUnused(context, workBuffers);
+			return false;
 		};
 
 	private:
@@ -170,15 +170,21 @@ namespace customDsp {
 			std::for_each(processors.begin(), processors.end(), [&](Processor* p) {p->reset(); });
 		};
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
-			std::for_each(processors.begin(), processors.end(), [&](Processor* p) {p->process(context, workBuffers); });
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
+			bool needMoreTime = false;
+			std::for_each(processors.begin(), processors.end(), [&](Processor* p) {
+				needMoreTime |= p->process(context, workBuffers);
+				});
+			return needMoreTime;
 		};
 
 		virtual void noteOn() override {
+			Processor::noteOn();
 			std::for_each(processors.begin(), processors.end(), [&](Processor* p) {p->noteOn(); });
 		}
 
 		virtual void noteOff() override {
+			Processor::noteOff();
 			std::for_each(processors.begin(), processors.end(), [&](Processor* p) {p->noteOff(); });
 		};
 
@@ -207,19 +213,20 @@ namespace customDsp {
 		using ProcessorChain::ProcessorChain;
 	public:
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
 			jassert(processors.size() < context.getOutputBlock().getNumChannels());
+			bool needMoreTime = false;
 			for (int i = 0; i < processors.size(); i++) {
 				auto singleOutputChannel = context.getOutputBlock().getSingleChannelBlock(i);
 				juce::dsp::ProcessContextNonReplacing<float> tmp_context{ context.getInputBlock(), singleOutputChannel };
-				processors[i]->process(tmp_context, workBuffers);
+				needMoreTime |= processors[i]->process(tmp_context, workBuffers);
 			}
+			return needMoreTime;
 		};
 
 	private:
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SplitProcessor)
 	};
-
 
 	class InterpolationOsc : public Processor {
 	public:
@@ -229,7 +236,7 @@ namespace customDsp {
 
 			bool bypassed{ false };
 			float wtPos{ 0.f }, pitch{ 0.f };
-			const wavetable::Wavetable* wt;
+			wavetable::Wavetable::Ptr wt;
 			ModulationParam modParams[3];
 			enum {
 				ENV,
@@ -240,21 +247,6 @@ namespace customDsp {
 			virtual InterpolationOsc* createProcessor() override {
 				return new InterpolationOsc(this);
 			};
-
-			//virtual void updateParams(const juce::AudioProcessorValueTreeState& apvts) override {
-			//	bypassed = apvts.getRawParameterValue(prefix + configuration::BYPASSED_SUFFIX)->load();
-
-			//	modParams[ENV].updateModParams(apvts, prefix + configuration::ENV_SUFFIX);
-
-			//	wtPos = apvts.getRawParameterValue(prefix + configuration::WT_POS_SUFFIX)->load();
-			//	modParams[WT_POS].updateModParams(apvts, prefix + configuration::WT_POS_SUFFIX);
-
-			//	pitch = apvts.getRawParameterValue(prefix + configuration::PITCH_SUFFIX)->load();
-			//	modParams[PITCH].updateModParams(apvts, prefix + configuration::PITCH_SUFFIX);
-
-			//	wt = wavetable::WavetableManager::getWavetable(
-			//		static_cast<int>(apvts.getRawParameterValue(prefix + configuration::WT_SUFFIX)->load()), sampleRate);
-			//}
 
 			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
 
@@ -282,7 +274,7 @@ namespace customDsp {
 				layout.add(std::make_unique<juce::AudioParameterChoice>(
 					prefix + configuration::WT_SUFFIX,
 					prefix + configuration::WT_SUFFIX,
-					wavetable::WavetableManager::getWavetableNames(),
+					wavetable::WavetableCache::getInstance()->getWavetableNames(),
 					0));
 			}
 
@@ -307,7 +299,7 @@ namespace customDsp {
 					pitch = newValue;
 				}
 				else if (parameterID.endsWith(configuration::WT_SUFFIX)) {
-					wt = wavetable::WavetableManager::getWavetable(static_cast<int>(newValue), sampleRate);
+					wt = wavetable::WavetableCache::getInstance()->getWavetable(static_cast<int>(newValue));
 				}
 				else {
 					jassertfalse;
@@ -329,7 +321,7 @@ namespace customDsp {
 			phase.reset();
 		}
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
 
 		void setFrequency(float t_frequency, bool force = true) {
 			juce::ignoreUnused(force);
@@ -361,7 +353,7 @@ namespace customDsp {
 			using Processor::SharedData::SharedData;
 
 			float wtPos{ 0.f }, rate{ 1.f };
-			const wavetable::Wavetable* wt;
+			wavetable::Wavetable::Ptr wt;
 
 			virtual LFO* createProcessor() override {
 				return new LFO(this);
@@ -384,7 +376,7 @@ namespace customDsp {
 				layout.add(std::make_unique<juce::AudioParameterChoice>(
 					prefix + configuration::WT_SUFFIX,
 					prefix + configuration::WT_SUFFIX,
-					wavetable::WavetableManager::getWavetableNames(),
+					wavetable::WavetableCache::getInstance()->getWavetableNames(),
 					0));
 			}
 
@@ -402,7 +394,7 @@ namespace customDsp {
 					rate = newValue;
 				}
 				else if (parameterID.endsWith(configuration::WT_SUFFIX)) {
-					wt = wavetable::WavetableManager::getWavetable(static_cast<int>(newValue), sampleRate);
+					wt = wavetable::WavetableCache::getInstance()->getWavetable(static_cast<int>(newValue));
 				}
 				else {
 					jassertfalse;
@@ -425,7 +417,7 @@ namespace customDsp {
 			phase.reset();
 		}
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
 
 	private:
 		SharedData* data;
@@ -490,7 +482,7 @@ namespace customDsp {
 		virtual void reset() override {
 		}
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
 
 	private:
 		SharedData* data;
@@ -525,12 +517,12 @@ namespace customDsp {
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
 					prefix + configuration::ATTACK_SUFFIX,
 					prefix + configuration::ATTACK_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 10.0f, 0.001f, 0.25f),
+					juce::NormalisableRange<float>(0.0f, 10.0f, 0.001f, 0.35f),
 					stageValues[(int)Stage::ATTACK]));
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
 					prefix + configuration::DECAY_SUFFIX,
 					prefix + configuration::DECAY_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 10.0f, 0.001f, 0.25f),
+					juce::NormalisableRange<float>(0.0f, 10.0f, 0.001f, 0.35f),
 					stageValues[(int)Stage::DECAY]));
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
 					prefix + configuration::SUSTAIN_SUFFIX,
@@ -540,7 +532,7 @@ namespace customDsp {
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
 					prefix + configuration::RELEASE_SUFFIX,
 					prefix + configuration::RELEASE_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 10.0f, 0.001f, 0.25f),
+					juce::NormalisableRange<float>(0.0f, 10.0f, 0.001f, 0.35f),
 					stageValues[(int)Stage::RELEASE]));
 			}
 
@@ -583,7 +575,7 @@ namespace customDsp {
 
 		virtual void reset() override;
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
 
 		virtual void noteOn() override;
 

@@ -10,10 +10,10 @@ namespace customDsp {
 		samplesUntilTransition = (size_t)-1;
 	}
 
-	void Envelope::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) {
+	bool Envelope::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) {
 		juce::ignoreUnused(workBuffers);
 		if (stage == Stage::IDLE || context.isBypassed) {
-			return;
+			return false;
 		}
 		auto& outputBlock = context.getOutputBlock();
 		auto currentPos = 0;
@@ -24,7 +24,7 @@ namespace customDsp {
 				transition();
 			}
 			auto samplesThisStep = samplesUntilTransition > 0 ? // "Do I need to transition at some point (>0)?"
-				juce::jmin((int)juce::jmin(samplesUntilTransition, samplesRemaining), configuration::MOD_BLOCK_SIZE) // ouch
+				juce::jmin((int)juce::jmin(samplesUntilTransition, samplesRemaining), configuration::MOD_BLOCK_SIZE)
 				: juce::jmin((int)samplesRemaining, configuration::MOD_BLOCK_SIZE);
 
 			outputBlock.getSubBlock(currentPos, samplesThisStep).add(level);
@@ -33,13 +33,17 @@ namespace customDsp {
 			samplesUntilTransition -= samplesThisStep;
 			samplesRemaining -= samplesThisStep;
 		}
+
+		return true;
 	};
 
 	void Envelope::noteOn() {
+		Processor::noteOn();
 		reset();
 		transition();
 	}
 	void Envelope::noteOff() {
+		Processor::noteOff();
 		if (stage != Stage::IDLE) {
 			stage = Stage::SUSTAIN;
 			transition();
@@ -75,12 +79,14 @@ namespace customDsp {
 		}
 	}
 
-	void InterpolationOsc::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
+	bool InterpolationOsc::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
 	{
 		if (data->bypassed || context.isBypassed) {
-			return;
+			return false;
 		}
-
+		if (!data->modParams[SharedData::ENV].isActive() && !isNoteOn) {
+			return false;
+		}
 		auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
 		auto& outputBlock = context.getOutputBlock();
 
@@ -147,9 +153,11 @@ namespace customDsp {
 		for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
 			outputBlock.getSingleChannelBlock(channel).add(workBuffers.getSingleChannelBlock(0));
 		}
+
+		return isNoteOn;
 	};
 
-	void LFO::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
+	bool LFO::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
 	{
 		// TODO Use also wavetable!
 		auto& outputBlock = context.getOutputBlock();
@@ -180,14 +188,16 @@ namespace customDsp {
 			auto sample = juce::jmap(channelDelta, sample0, sample1);
 			outputBlock.getSubBlock(start, length).add(sample);
 		}
+
+		return isNoteOn;
 	};
 
 
-	void Gain::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
+	bool Gain::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
 	{
 
 		if (context.isBypassed) {
-			return;
+			return false;
 		}
 
 		auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
@@ -201,7 +211,8 @@ namespace customDsp {
 		for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
 			outputBlock.getSingleChannelBlock(channel).multiplyBy(workChannel);
 		}
-	};
 
+		return isNoteOn;
+	};
 
 }

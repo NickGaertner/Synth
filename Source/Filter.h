@@ -42,7 +42,7 @@ namespace customDsp {
 			bool bypassed{ false };
 			FilterType filterType{ FilterType::NONE };
 			// these use the range [0,1]. it's up to the actual filter to map these to an useful range
-			float cutoff{ 0.5 }, resonance{ 0.5 }, special{ 0.0 };
+			float cutoff{ 0.5f }, resonance{ 0.5f }, special{ 0.0f };
 			ModulationParam modParams[3];
 			enum {
 				CUTOFF,
@@ -50,11 +50,11 @@ namespace customDsp {
 				SPECIAL,
 			};
 
-			int numberOfChannels = -1;
+			int numChannels = -1;
 
 			virtual FilterChooser* createProcessor() override {
 				return new FilterChooser(this);
-			};
+			}
 
 			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
 
@@ -134,7 +134,11 @@ namespace customDsp {
 
 		virtual void reset() override;
 
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+		
+		virtual void noteOn() override;
+
+		virtual void noteOff() override;
 
 	private:
 		SharedData* data;
@@ -146,8 +150,8 @@ namespace customDsp {
 
 	public:
 		Filter() = delete;
-		Filter(FilterChooser::SharedData* t_data) : data(t_data) {};
-		virtual ~Filter() {};
+		Filter(FilterChooser::SharedData* t_data) : data(t_data) {}
+		virtual ~Filter() {}
 
 		virtual void updateMode() = 0;
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
@@ -167,7 +171,7 @@ namespace customDsp {
 		using Filter::Filter;
 	public:
 		virtual void reset() override {}
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {}
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override { return false; }
 		virtual void prepareUpdate() {}
 	private:
 		void updateMode() override {}
@@ -180,7 +184,7 @@ namespace customDsp {
 	public:
 		virtual void prepareUpdate() override;
 		virtual void reset() override;
-		virtual void process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
 
 	private:
 		void updateMode() override;
