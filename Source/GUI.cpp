@@ -1,5 +1,6 @@
 
 #include "GUI.h"
+#include "FX.h"
 
 customGui::SynthComponent::SynthComponent(SynthAudioProcessor& audioProcessor)
 {
@@ -86,7 +87,7 @@ void customGui::SynthComponent::initModules(SynthAudioProcessor& audioProcessor)
 	}
 }
 
-customGui::SynthModule::SynthModule(SynthAudioProcessor& audioProcessor, int id)
+customGui::SynthModule::SynthModule(SynthAudioProcessor& audioProcessor, int id, int cols )
 {
 	juce::ignoreUnused(audioProcessor, id);
 	mainGrid.autoFlow = juce::Grid::AutoFlow::row;
@@ -95,11 +96,11 @@ customGui::SynthModule::SynthModule(SynthAudioProcessor& audioProcessor, int id)
 
 	mainGrid.templateRows = { Track(Fr(1)), Track(Fr(5)), Track(Fr(5)), Track(Fr(1)), };
 
-	mainGrid.templateColumns = { Track(Fr(1)), Track(Fr(1)), Track(Fr(1)), };
+	mainGrid.templateColumns = { Track(Fr(1)), Track(Fr(1)),};
 
 	mainGrid.items = {
 		juce::GridItem(powerAndName).withArea(Property(1), Property(1)),
-		juce::GridItem(dropDown).withArea(Property(1), Property(2), Property(1), Property(-1)),
+		juce::GridItem(dropDown).withArea(Property(1), Property(2), Property(1), Property(cols+1)),
 
 	};
 
@@ -118,7 +119,7 @@ void customGui::SynthModule::resized()
 }
 
 customGui::OscModule::OscModule(SynthAudioProcessor& audioProcessor, int id) :
-	SynthModule(audioProcessor, id)
+	SynthModule(audioProcessor, id,4)
 {
 	juce::String prefix{ configuration::OSC_PREFIX + juce::String(id) };
 
@@ -159,8 +160,8 @@ customGui::OscModule::OscModule(SynthAudioProcessor& audioProcessor, int id) :
 	auto& apvts = audioProcessor.getApvts();
 
 	buttonAttachments.add(new ButtonAttachment(apvts, prefix + configuration::BYPASSED_SUFFIX, powerAndName.powerButton));
-	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + configuration::WT_SUFFIX, dropDown)); 
 	dropDown.addItemList(dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(prefix + configuration::WT_SUFFIX))->choices, 1);
+	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + configuration::WT_SUFFIX, dropDown)); 
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::WT_POS_SUFFIX, wtPosKnob.slider));
 	sliderAttachments.add(new SliderAttachment(apvts,
@@ -196,7 +197,7 @@ customGui::OscModule::OscModule(SynthAudioProcessor& audioProcessor, int id) :
 }
 
 customGui::FilterModule::FilterModule(SynthAudioProcessor& audioProcessor, int id) :
-	SynthModule(audioProcessor, id)
+	SynthModule(audioProcessor, id,3)
 {
 	juce::String prefix{ configuration::FILTER_PREFIX + juce::String(id) };
 
@@ -233,8 +234,8 @@ customGui::FilterModule::FilterModule(SynthAudioProcessor& audioProcessor, int i
 	auto& apvts = audioProcessor.getApvts();
 
 	buttonAttachments.add(new ButtonAttachment(apvts, prefix + configuration::BYPASSED_SUFFIX, powerAndName.powerButton));
-	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + configuration::FILTER_TYPE_SUFFIX, dropDown));
 	dropDown.addItemList(dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(prefix + configuration::FILTER_TYPE_SUFFIX))->choices, 1);
+	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + configuration::FILTER_TYPE_SUFFIX, dropDown));
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::CUTOFF_SUFFIX, cutoffKnob.slider));
 	sliderAttachments.add(new SliderAttachment(apvts,
@@ -265,7 +266,7 @@ customGui::FilterModule::FilterModule(SynthAudioProcessor& audioProcessor, int i
 }
 
 customGui::FXModule::FXModule(SynthAudioProcessor& audioProcessor, int id) :
-	SynthModule(audioProcessor, id)
+	SynthModule(audioProcessor, id,4)
 {
 	juce::String prefix{ configuration::FX_PREFIX + juce::String(id) };
 
@@ -310,8 +311,14 @@ customGui::FXModule::FXModule(SynthAudioProcessor& audioProcessor, int id) :
 	auto& apvts = audioProcessor.getApvts();
 
 	buttonAttachments.add(new ButtonAttachment(apvts, prefix + configuration::BYPASSED_SUFFIX, powerAndName.powerButton));
-	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + configuration::FX_TYPE_SUFFIX, dropDown));
+	dropDown.onChange = [&]() {
+		int fxType = dropDown.getSelectedId() - 1;
+		parameter0Knob.setLabelText(customDsp::PARAMETER_0_NAMES[fxType]);
+		parameter1Knob.setLabelText(customDsp::PARAMETER_1_NAMES[fxType]);
+		parameter2Knob.setLabelText(customDsp::PARAMETER_2_NAMES[fxType]);
+	};
 	dropDown.addItemList(dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(prefix + configuration::FX_TYPE_SUFFIX))->choices, 1);
+	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + configuration::FX_TYPE_SUFFIX, dropDown));
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::DRY_WET_SUFFIX, dryWetKnob.slider));
 	sliderAttachments.add(new SliderAttachment(apvts,
@@ -393,8 +400,8 @@ customGui::LFOModule::LFOModule(SynthAudioProcessor& audioProcessor, int id)
 	powerAndName.nameLabel.setText(juce::String(prefix), juce::NotificationType::dontSendNotification);
 
 	mainGrid.items.addArray({
-		juce::GridItem(wtPosKnob).withArea(Property(2), Property(2)),
-		juce::GridItem(rateKnob).withArea(Property(3), Property(2)),
+		juce::GridItem(wtPosKnob).withArea(Property(2), Property(1)),
+		juce::GridItem(rateKnob).withArea(Property(2), Property(2)),
 		});
 
 	addAndMakeVisible(wtPosKnob);
@@ -403,8 +410,8 @@ customGui::LFOModule::LFOModule(SynthAudioProcessor& audioProcessor, int id)
 	// VALUE TREE ATTACHMENTS
 	auto& apvts = audioProcessor.getApvts();
 
-	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + configuration::WT_SUFFIX, dropDown));
 	dropDown.addItemList(dynamic_cast<juce::AudioParameterChoice*>(apvts.getParameter(prefix + configuration::WT_SUFFIX))->choices, 1);
+	comboBoxAttachments.add(new ComboBoxAttachment(apvts, prefix + configuration::WT_SUFFIX, dropDown));
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::WT_POS_SUFFIX, wtPosKnob.slider));
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::RATE_SUFFIX, rateKnob.slider));

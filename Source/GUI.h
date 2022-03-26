@@ -64,8 +64,8 @@ namespace customGui {
 
 	class NamedKnob : public juce::Component {
 	public:
-		NamedKnob(const juce::String& labelName = juce::String("Name"), bool displayValue = false) :
-			nameLabel(juce::String(), labelName),
+		NamedKnob(const juce::String& labelText = juce::String("Name"), bool displayValue = false) :
+			nameLabel(juce::String(), labelText),
 			slider(juce::Slider::SliderStyle::RotaryVerticalDrag,
 				displayValue ? juce::Slider::TextEntryBoxPosition::TextBoxBelow : juce::Slider::TextEntryBoxPosition::NoTextBox)
 		{
@@ -76,7 +76,9 @@ namespace customGui {
 			addAndMakeVisible(slider);
 			mainVBox.items.add(juce::FlexItem(slider).withFlex(1.f));
 		}
-
+		virtual void setLabelText(const juce::String& t_text) {
+			nameLabel.setText(t_text, juce::NotificationType::sendNotification);
+		}
 		virtual void resized() override {
 			mainVBox.performLayout(getLocalBounds());
 		}
@@ -173,7 +175,7 @@ namespace customGui {
 	class SynthModule : public juce::Component {
 	public:
 		SynthModule() = delete;
-		SynthModule(SynthAudioProcessor& audioProcessor, int id);
+		SynthModule(SynthAudioProcessor& audioProcessor, int id, int cols = 2);
 		virtual ~SynthModule() override {}
 
 		virtual void paint(juce::Graphics& g) override;
@@ -204,7 +206,6 @@ namespace customGui {
 		} powerAndName;
 
 		juce::ComboBox dropDown;
-
 		juce::OwnedArray<ButtonAttachment> buttonAttachments;
 		juce::OwnedArray<ComboBoxAttachment> comboBoxAttachments;
 		juce::OwnedArray<SliderAttachment> sliderAttachments;
@@ -215,21 +216,30 @@ namespace customGui {
 	};
 
 	class ModuleHolder : public juce::Component {
-		using Component::Component;
 	public:
+		ModuleHolder(int cols = 1) {
+			grid.autoFlow = juce::Grid::AutoFlow::row;
+			grid.autoRows = Track(Fr(1));
+			grid.autoColumns = Track(Fr(1));
 
+			//ainGrid.templateRows = { Track(Fr(1)), Track(Fr(5)), Track(Fr(5)), Track(Fr(1)), };
+			for (int i = 0; i < cols; i++) {
+				grid.templateColumns.add(Track(Fr(1)));
+
+			}
+		}
 		void addModule(SynthModule* module) {
 			modules.add(module);
-			vBox.items.add(juce::FlexItem(*module).withFlex(1.f));
+			grid.items.add(juce::GridItem(*module));
 			addAndMakeVisible(*module);
 		}
 
 		virtual void resized() override {
-			vBox.performLayout(getLocalBounds());
+			grid.performLayout(getLocalBounds());
 		}
 	private:
 		juce::OwnedArray<SynthModule> modules;
-		juce::FlexBox vBox = Util::createVBox();
+		juce::Grid grid = Util::createStretchGrid();
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ModuleHolder)
 	};
@@ -360,8 +370,8 @@ namespace customGui {
 		ModuleHolder oscModuleHolder;
 		ModuleHolder filterModuleHolder;
 		ModuleHolder fxModuleHolder;
-		ModuleHolder envModuleHolder;
-		ModuleHolder lfoModuleHolder;
+		ModuleHolder envModuleHolder{2};
+		ModuleHolder lfoModuleHolder{2};
 		juce::Label panModule;
 		juce::Label masterModule;
 

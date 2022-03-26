@@ -27,6 +27,36 @@ namespace customDsp {
 		"Tube",
 	};
 
+	inline static const juce::StringArray PARAMETER_0_NAMES{
+		"-",
+		"Size",
+		"Flanger",
+		"Chorus",
+		"Phaser",
+		"Delay",
+		"Tube",
+	};
+
+	inline static const juce::StringArray PARAMETER_1_NAMES{
+		"-",
+		"Damping",
+		"Flanger",
+		"Chorus",
+		"Phaser",
+		"Delay",
+		"Tube",
+	};
+
+	inline static const juce::StringArray PARAMETER_2_NAMES{
+		"-",
+		"Width",
+		"Flanger",
+		"Chorus",
+		"Phaser",
+		"Delay",
+		"Tube",
+	};
+
 	class FX;
 
 	class FXChooser : public Processor {

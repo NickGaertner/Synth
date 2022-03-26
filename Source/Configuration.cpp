@@ -6,8 +6,8 @@ namespace configuration {
 	const int OSC_NUMBER = 2; // 2
 	const int FILTER_NUMBER = 2; // 2
 	const int FX_NUMBER = 2; // 2
-	const int ENV_NUMBER = 2; // 2
-	const int LFO_NUMBER = 2; // 2
+	const int ENV_NUMBER = 4; // 2
+	const int LFO_NUMBER = 4; // 2
 
 	const int MOD_BLOCK_SIZE = 128;
 
