@@ -158,7 +158,9 @@ void SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 	buffer.clear();
 
 	synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
-
+	if (observationCallback) {
+		observationCallback(buffer);
+	}
 	performanceCounter.stop();
 }
 

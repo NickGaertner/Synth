@@ -60,6 +60,8 @@ public:
 		return apvts;
 	}
 
+	std::function<void(const juce::dsp::AudioBlock<float>& audioBlock)> observationCallback{};
+
 private:
 
 	void initSynths();

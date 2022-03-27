@@ -172,6 +172,58 @@ namespace customGui {
 	//	JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(BasicWaveformChooser)
 	//};
 
+	class SpectrumAnalyzer : public juce::Component, private juce::Timer {
+	public:
+
+		SpectrumAnalyzer(SynthAudioProcessor& t_audioProcessor);
+		virtual void paint(juce::Graphics& g) override;
+		virtual void resized() override;
+		virtual void timerCallback() override;
+		void readBlock(const juce::dsp::AudioBlock<float>& audioBlock);
+
+		void setBypassed(bool t_bypassed) {
+			bypassed = t_bypassed;
+		}
+
+		void setFFTOrder(int t_order);
+
+		void setBlockNumber(int t_numBlocks);
+
+		int getFFTOrder() {
+			return fftOrder;
+		}
+		int getBlockNumber() {
+			return numBlocks;
+		}
+	private:
+		void drawFrame(juce::Graphics& g);
+
+		void updateSpectrum();
+
+		bool bypassed = false;
+		int fftOrder;
+		static inline const int minFFTOrder = 11;
+		static inline const int maxFFTOrder = 15;
+		int fftSize;
+		static inline const int maxFFTSize = 1 << maxFFTOrder;
+		static inline const int scopeSize = 1024;
+
+		juce::dsp::FFT forwardFFT{ 1 };
+		std::unique_ptr<juce::dsp::WindowingFunction<float>> window;
+
+		float fifo[maxFFTSize]{ 0.f };
+		int fifoBlockOffset;
+		int numBlocks = 8;
+		int fifoBlockSize;
+		int fifoLocalIndex;
+
+		float fftData[2 * maxFFTSize]{ 0.f };
+		bool nextFFTBlockReady = false;
+		float scopeData[scopeSize]{ 0.f };
+
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SpectrumAnalyzer)
+	};
+
 	class SynthModule : public juce::Component {
 	public:
 		SynthModule() = delete;
@@ -353,6 +405,18 @@ namespace customGui {
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LFOModule)
 	};
 
+	class SpectrumAnalyzerModule : public SynthModule {
+	public:
+		SpectrumAnalyzerModule() = delete;
+		SpectrumAnalyzerModule(SynthAudioProcessor& audioProcessor, int id = 0);
+		virtual ~SpectrumAnalyzerModule() override {};
+	protected:
+		SpectrumAnalyzer analyzer;
+		NamedKnob fftOrderKnob{ "FFT Order" };
+		NamedKnob refreshRateKnob{ "Refresh Rate" };
+	private:
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SpectrumAnalyzerModule);
+	};
 	class SynthComponent : public juce::Component {
 	public:
 		SynthComponent() = delete;
@@ -370,10 +434,11 @@ namespace customGui {
 		ModuleHolder oscModuleHolder;
 		ModuleHolder filterModuleHolder;
 		ModuleHolder fxModuleHolder;
-		ModuleHolder envModuleHolder{2};
-		ModuleHolder lfoModuleHolder{2};
+		ModuleHolder envModuleHolder{ 2 };
+		ModuleHolder lfoModuleHolder{ 2 };
 		juce::Label panModule;
 		juce::Label masterModule;
+		SpectrumAnalyzerModule spectrumModule;
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthComponent)
 	};

@@ -3,11 +3,11 @@
 
 namespace configuration {
 	const int POLYPHONY = 16; // 16
-	const int OSC_NUMBER = 2; // 2
+	const int OSC_NUMBER = 3; // 3
 	const int FILTER_NUMBER = 2; // 2
 	const int FX_NUMBER = 2; // 2
-	const int ENV_NUMBER = 4; // 2
-	const int LFO_NUMBER = 4; // 2
+	const int ENV_NUMBER = 4; // 4
+	const int LFO_NUMBER = 4; // 4
 
 	const int MOD_BLOCK_SIZE = 128;
 

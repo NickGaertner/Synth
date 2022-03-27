@@ -51,7 +51,7 @@ namespace wavetable {
 
 	const juce::AudioBuffer<float>& Wavetable::getTable(int exponent) const
 	{
-		jassert(4 <= exponent && exponent <= 14);
+		exponent = juce::jlimit(4, 14, exponent); // through pitch you could get values outside the normal frequency range
 		return tables[exponent - 4];
 	}
 
