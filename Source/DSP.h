@@ -419,6 +419,10 @@ namespace customDsp {
 
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
 
+		void advancePhase(float step) {
+			jassert(0.f <= step && step < juce::MathConstants<float>::twoPi);
+			phase.advance(step);
+		}
 	private:
 		SharedData* data;
 
@@ -505,7 +509,7 @@ namespace customDsp {
 		struct SharedData : public Processor::SharedData {
 			using Processor::SharedData::SharedData;
 
-			float stageValues[(int)Stage::STAGE_NUMBER]{ 0.f,0.2f,0.3f,0.9f,0.2f };
+			float stageValues[(int)Stage::STAGE_NUMBER]{ 0.f,0.1f,0.3f,0.9f,0.05f };
 			const float minLevel = juce::Decibels::decibelsToGain(-96.f);
 
 
@@ -517,12 +521,12 @@ namespace customDsp {
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
 					prefix + configuration::ATTACK_SUFFIX,
 					prefix + configuration::ATTACK_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 10.0f, 0.001f, 0.35f),
+					juce::NormalisableRange<float>(0.00f, 10.0f, 0.001f, 0.35f),
 					stageValues[(int)Stage::ATTACK]));
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
 					prefix + configuration::DECAY_SUFFIX,
 					prefix + configuration::DECAY_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 10.0f, 0.001f, 0.35f),
+					juce::NormalisableRange<float>(0.00f, 10.0f, 0.001f, 0.35f),
 					stageValues[(int)Stage::DECAY]));
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
 					prefix + configuration::SUSTAIN_SUFFIX,
@@ -532,7 +536,7 @@ namespace customDsp {
 				layout.add(std::make_unique<juce::AudioParameterFloat>(
 					prefix + configuration::RELEASE_SUFFIX,
 					prefix + configuration::RELEASE_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 10.0f, 0.001f, 0.35f),
+					juce::NormalisableRange<float>(0.05f, 10.0f, 0.001f, 0.35f),
 					stageValues[(int)Stage::RELEASE]));
 			}
 
@@ -598,5 +602,68 @@ namespace customDsp {
 		size_t samplesUntilTransition = 0;
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Envelope);
+	};
+
+	class Pan : public Processor {
+	public:
+
+		struct SharedData : public Processor::SharedData {
+			using Processor::SharedData::SharedData;
+
+			float pan{ 0.f };
+			ModulationParam modParams[1];
+			enum {
+				PAN
+			};
+
+			virtual Pan* createProcessor() override {
+				return new Pan(this);
+			};
+
+			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
+				layout.add(std::make_unique<juce::AudioParameterFloat>(
+					prefix + configuration::PAN_SUFFIX,
+					prefix + configuration::PAN_SUFFIX,
+					juce::NormalisableRange<float>(-1.0f, 1.0f, 0.001f, 1.f),
+					pan));
+				modParams[PAN].addModParams(layout, prefix + configuration::PAN_SUFFIX);
+			}
+
+			virtual void registerAsListener(juce::AudioProcessorValueTreeState& apvts) override {
+				apvts.addParameterListener(prefix + configuration::PAN_SUFFIX, this);
+				modParams[PAN].registerAsListener(apvts, prefix + configuration::PAN_SUFFIX);
+			}
+
+			virtual void parameterChanged(const juce::String& parameterID, float newValue) override {
+				if (parameterID.endsWith(configuration::PAN_SUFFIX)) {
+					pan = newValue;
+				}
+				else {
+					jassertfalse;
+				}
+			}
+
+		private:
+			JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SharedData)
+		};
+
+		Pan() = delete;
+
+		Pan(SharedData* t_data) : data(t_data) {}
+
+
+		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
+			data->sampleRate = spec.sampleRate;
+		};
+
+		virtual void reset() override {
+		}
+
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+
+	private:
+		SharedData* data;
+
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Pan);
 	};
 }

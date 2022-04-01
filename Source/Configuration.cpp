@@ -62,6 +62,7 @@ namespace configuration {
 	const juce::String PARAMETER_0_SUFFIX{"::PARAMETER_0"};
 	const juce::String PARAMETER_1_SUFFIX{ "::PARAMETER_1" };
 	const juce::String PARAMETER_2_SUFFIX{ "::PARAMETER_2" };
+	const juce::String PAN_SUFFIX{"::PAN"};
 
 	const juce::String WT_FOLDER_NAME{"wavetables"};
 	const juce::String WT_FILE_EXTENSION{".wt"};

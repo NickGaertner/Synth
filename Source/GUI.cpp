@@ -3,20 +3,22 @@
 #include "FX.h"
 
 customGui::SynthComponent::SynthComponent(SynthAudioProcessor& audioProcessor)
-	: spectrumModule(audioProcessor)
+	: spectrumModule(audioProcessor), panModule(audioProcessor), masterModule(audioProcessor)
 {
 	mainGrid.columnGap = Px(0);
 	mainGrid.rowGap = Px(0);
 
 	mainGrid.templateRows = { Track("header-row-start", Fr(1), "header-row-end"),
 	Track("modules0-row-start", Fr(6), "modules0-row-end"),
-	Track("modules1-row-start", Fr(3), "modules1.5-row-end"), 
-	Track("modules1.5-row-start", Fr(3), "modules1-row-end"), 
+	Track("modules1-row-start", Fr(3), "modules1.5-row-end"),
+	Track("modules1.5-row-start", Fr(3), "modules1-row-end"),
 	};
 
-	mainGrid.templateColumns = { Track("col0-start", Fr(1), "col0-end"),
-	Track("col1-start", Fr(1), "col1-end"),
-	Track("col2-start", Fr(1), "col2-end"), };
+	mainGrid.templateColumns = { Track("col0-start", Fr(2), "col0-end"),
+	Track("col1-start", Fr(2), "col1-end"),
+	Track("col2-start", Fr(1), "col2.5-end"),
+	Track("col2.5-start", Fr(1), "col2-end"),
+	};
 
 
 	mainGrid.items = {
@@ -33,9 +35,11 @@ customGui::SynthComponent::SynthComponent(SynthAudioProcessor& audioProcessor)
 		Property("modules1-row-end"), Property("col1-end")),
 		juce::GridItem(lfoModuleHolder).withArea(Property("modules1.5-row-start"), Property("col0-start"),
 		Property("modules1-row-end"), Property("col0-end")),
-		//juce::GridItem(panModule).withArea(Property("header-row-start"), Property(1), Property("header-row-end"), Property(-1)),
-		//juce::GridItem(masterModule).withArea(Property("modules1-row-start"), Property("col2-start"),
-		//Property("modules1-row-end"), Property("col2-end")),
+		juce::GridItem(panModule).withArea(Property("modules1-row-start"), Property("col2-start"),
+		Property("modules1.5-row-end"), Property("col2.5-end")),
+		juce::GridItem(masterModule).withArea(Property("modules1-row-start"), Property("col2.5-start"),
+		Property("modules1.5-row-end"), Property("col2-end")),
+
 		juce::GridItem(spectrumModule).withArea(Property("modules1.5-row-start"), Property("col2-start"),
 		Property("modules1-row-end"), Property("col2-end")),
 	};
@@ -48,13 +52,9 @@ customGui::SynthComponent::SynthComponent(SynthAudioProcessor& audioProcessor)
 	addAndMakeVisible(fxModuleHolder);
 	addAndMakeVisible(envModuleHolder);
 	addAndMakeVisible(lfoModuleHolder);
-	addAndMakeVisible(spectrumModule);
-
-	/*panModule.setColour(juce::Label::ColourIds::backgroundColourId, Util::createRandomColour());
 	addAndMakeVisible(panModule);
-
-	masterModule.setColour(juce::Label::ColourIds::backgroundColourId, Util::createRandomColour());
-	addAndMakeVisible(masterModule);*/
+	addAndMakeVisible(masterModule);
+	addAndMakeVisible(spectrumModule);
 
 	initModules(audioProcessor);
 }
@@ -101,7 +101,7 @@ customGui::SynthModule::SynthModule(SynthAudioProcessor& audioProcessor, int id,
 
 	mainGrid.templateRows = { Track(Fr(1)), Track(Fr(5)), Track(Fr(5)), Track(Fr(1)), };
 
-	mainGrid.templateColumns = { Track(Fr(1)), Track(Fr(1)), };
+	//mainGrid.templateColumns = { Track(Fr(1)), Track(Fr(1)), };
 
 	mainGrid.items = {
 		juce::GridItem(powerAndName).withArea(Property(1), Property(1)),
@@ -405,7 +405,7 @@ customGui::LFOModule::LFOModule(SynthAudioProcessor& audioProcessor, int id)
 	powerAndName.nameLabel.setText(juce::String(prefix), juce::NotificationType::dontSendNotification);
 
 	// adjust original layout
-	mainGrid.templateRows = { Track(Fr(1)), Track(Fr(5))};
+	mainGrid.templateRows = { Track(Fr(1)), Track(Fr(5)) };
 
 	mainGrid.items.addArray({
 		juce::GridItem(wtPosKnob).withArea(Property(2), Property(1)),
@@ -423,6 +423,67 @@ customGui::LFOModule::LFOModule(SynthAudioProcessor& audioProcessor, int id)
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::WT_POS_SUFFIX, wtPosKnob.slider));
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::RATE_SUFFIX, rateKnob.slider));
+}
+
+customGui::PanModule::PanModule(SynthAudioProcessor& audioProcessor, int id)
+	: SynthModule(audioProcessor, id)
+{
+	juce::String prefix{ configuration::PAN_PREFIX };
+
+	// LAYOUT
+	powerAndName.powerButton.setVisible(false);
+	powerAndName.nameLabel.setText(prefix, juce::NotificationType::dontSendNotification);
+	dropDown.setVisible(false);
+
+	mainGrid.items.addArray({
+		juce::GridItem(panKnob).withArea(Property(2), Property(1)),
+		juce::GridItem(panModKnob).withArea(Property(3), Property(1)),
+		juce::GridItem(panModSrcChooser).withArea(Property(4), Property(1)),
+		});
+
+	addAndMakeVisible(panKnob);
+	addAndMakeVisible(panModKnob);
+	addAndMakeVisible(panModSrcChooser);
+
+	// VALUE TREE ATTACHMENTS
+	auto& apvts = audioProcessor.getApvts();
+
+	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::PAN_SUFFIX, panKnob.slider));
+	sliderAttachments.add(new SliderAttachment(apvts,
+		prefix + configuration::PAN_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
+		panModKnob.slider));
+	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
+		prefix + configuration::PAN_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
+		panModSrcChooser));
+	panModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
+}
+
+customGui::MasterModule::MasterModule(SynthAudioProcessor& audioProcessor, int id)
+	: SynthModule(audioProcessor, id)
+{
+	juce::String prefix{ configuration::MASTER_PREFIX };
+
+	// LAYOUT
+	powerAndName.powerButton.setVisible(false);
+	powerAndName.nameLabel.setText(prefix, juce::NotificationType::dontSendNotification);
+	dropDown.setVisible(false);
+
+	mainGrid.items.addArray({
+		juce::GridItem(masterKnob).withArea(Property(2), Property(1)),
+		juce::GridItem(levelDisplay).withArea(Property(2), Property(2), Property(4), Property(3)),
+		});
+
+	addAndMakeVisible(masterKnob);
+	addAndMakeVisible(levelDisplay);
+
+	// VALUE TREE ATTACHMENTS
+	audioProcessor.masterLevelCallback = [&](float levelLeft, float levelRight) {
+		levelDisplay.updateLevel(levelLeft, levelRight);
+	};
+
+	auto& apvts = audioProcessor.getApvts();
+
+	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::GAIN_SUFFIX, masterKnob.slider));
 }
 
 customGui::SpectrumAnalyzerModule::SpectrumAnalyzerModule(SynthAudioProcessor& audioProcessor, int id)
@@ -514,7 +575,7 @@ void customGui::SpectrumAnalyzer::readBlock(const juce::dsp::AudioBlock<float>& 
 				auto wrapPos = fifoBlockOffset * fifoBlockSize;
 				auto bytesPerBlock = sizeof(float) * fftSize / numBlocks;
 				memcpy(fftData, fifo + wrapPos, (numBlocks - fifoBlockOffset) * bytesPerBlock);
-				memcpy(fftData+(fftSize-wrapPos), fifo, fifoBlockOffset * bytesPerBlock);
+				memcpy(fftData + (fftSize - wrapPos), fifo, fifoBlockOffset * bytesPerBlock);
 				/*for (int i = 0; i < fftSize; i++) {
 					fftData[i] = fifo[(i + fifoBlockOffset * fifoBlockSize) % fftSize];
 				}*/
@@ -571,7 +632,7 @@ void customGui::SpectrumAnalyzer::updateSpectrum()
 
 	const auto minDB = -80.f;
 	const auto maxDB = 0.f;
-	const auto halfSizeLog = std::log2f((fftSize / 2));
+	const auto halfSizeLog = std::log2f(static_cast<float>(fftSize / 2));
 	const auto localMinFreq = 25.f * (fftSize / 48000.f); // theoretically this should be dependant on sampleRate
 	const auto offset = std::log2f(localMinFreq) / halfSizeLog;
 
@@ -583,13 +644,13 @@ void customGui::SpectrumAnalyzer::updateSpectrum()
 	for (int i = 0; i < scopeSize; i++) {
 		auto t = (float)i / (float)scopeSize;
 		auto exponent = (offset + t * (1.f - offset)) * halfSizeLog;
-		int fftDataIndex = std::exp2f(exponent);
+		int fftDataIndex = static_cast<int>(std::exp2f(exponent));
 		auto level = fftData[fftDataIndex] / (max + 1);
 		level = juce::jmap(juce::Decibels::gainToDecibels(level), minDB, maxDB, 0.f, 1.f);
 
 		auto t2 = (float)(i + 0.5f) / (float)scopeSize;
 		auto exponent2 = (offset + t2 * (1.f - offset)) * halfSizeLog;
-		int fftDataIndex2 = std::exp2f(exponent2);
+		int fftDataIndex2 = static_cast<int>(std::exp2f(exponent2));
 		auto level2 = fftData[fftDataIndex2] / (max + 1);
 		level2 = juce::jmap(juce::Decibels::gainToDecibels(level2), minDB, maxDB, 0.f, 1.f);
 

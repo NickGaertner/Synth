@@ -111,7 +111,7 @@ namespace customDsp {
 		auto& wt = data->wt->getTable(frequency * std::exp2f((basePitch + pitchMod * pitchModSrc[0]) / 12.f));
 
 		for (int start = 0; start < workBuffers.getNumSamples(); start += configuration::MOD_BLOCK_SIZE) {
-			
+
 			auto end = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples());
 
 			// calculate modulated arguments for the next ~MOD_BLOCK_SIZE samples
@@ -147,7 +147,7 @@ namespace customDsp {
 				inputBlock.getSample((size_t)data->modParams[SharedData::ENV].src_channel, start)
 				: 1.f;
 			multiplier *= 0.125f * velocity;
-			workBuffers.getSingleChannelBlock(0).getSubBlock(start,end-start).multiplyBy(multiplier);
+			workBuffers.getSingleChannelBlock(0).getSubBlock(start, end - start).multiplyBy(multiplier);
 		}
 
 		for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
@@ -159,11 +159,10 @@ namespace customDsp {
 
 	bool LFO::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
 	{
-		// TODO Use also wavetable!
 		auto& outputBlock = context.getOutputBlock();
 
 		float phaseStep = (juce::MathConstants<float>::twoPi * data->rate) / (float)data->sampleRate;
-		
+
 		auto& wt = data->wt->getTable(30.f); // just get a low freq table
 
 		auto wtPos = data->wtPos;
@@ -174,8 +173,8 @@ namespace customDsp {
 		auto channel0 = wt.getReadPointer(channelIndex);
 		auto channel1 = wt.getReadPointer(channelIndex + 1);
 
-		for (int start = 0; start < workBuffers.getNumSamples(); start += configuration::MOD_BLOCK_SIZE) {
-			auto length = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples()) - start;
+		for (int start = 0; start < outputBlock.getNumSamples(); start += configuration::MOD_BLOCK_SIZE) {
+			auto length = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)outputBlock.getNumSamples()) - start;
 
 			auto x = phase.advance(phaseStep * length);
 
@@ -213,6 +212,38 @@ namespace customDsp {
 		}
 
 		return isNoteOn;
+	};
+
+	bool Pan::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
+	{
+		if (context.isBypassed) {
+			return false;
+		}
+
+		auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
+		auto& outputBlock = context.getOutputBlock();
+
+		jassert(outputBlock.getNumChannels() == 2);
+		auto left = outputBlock.getSingleChannelBlock(0);
+		auto right = outputBlock.getSingleChannelBlock(1);
+		// prepare for modulation
+
+		// pan
+		auto basePan = data->pan;
+		auto panMod = data->modParams[SharedData::PAN].factor;
+		auto panModSrc = inputBlock.getChannelPointer((size_t)data->modParams[SharedData::PAN].src_channel);
+
+		for (int start = 0; start < workBuffers.getNumSamples(); start += configuration::MOD_BLOCK_SIZE) {
+
+			auto end = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples());
+
+			auto currentPan = juce::jlimit(-1.f, 1.f, basePan + panMod * panModSrc[start]);
+
+			left.getSubBlock(start, end - start).multiplyBy(1.f-currentPan);
+			right.getSubBlock(start, end - start).multiplyBy(1.f+currentPan);
+		}
+
+		return false;
 	};
 
 }

@@ -61,6 +61,7 @@ public:
 	}
 
 	std::function<void(const juce::dsp::AudioBlock<float>& audioBlock)> observationCallback{};
+	std::function<void(float,float)> masterLevelCallback{};
 
 private:
 
@@ -70,11 +71,11 @@ private:
 	Synth::Synth synth;
 	// first OSC_NUMBER entries hold osc specific data, 
 	// the next entry holds mono processor/filter data,
-	// the next entry holds stereo processor/fx data
-	// the second to last entry holds master data (pan, master gain)
+	// the next entry holds stereo processor(fx & pan) data
+	// the second to last entry holds master data (master gain)
 	// and the last entry holds modulation parameters (envs and lfos)
 	std::vector<juce::OwnedArray<customDsp::Processor::SharedData>> processorData{configuration::OSC_NUMBER+4};
-
+	
 	juce::AudioProcessorValueTreeState::ParameterLayout createParameterDataAndLayout();
 
 	juce::AudioProcessorValueTreeState apvts{ *this, nullptr, "Parameters", createParameterDataAndLayout() };

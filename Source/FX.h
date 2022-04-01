@@ -30,30 +30,30 @@ namespace customDsp {
 	inline static const juce::StringArray PARAMETER_0_NAMES{
 		"-",
 		"Size",
-		"Flanger",
-		"Chorus",
-		"Phaser",
-		"Delay",
+		"Rate",
+		"Rate",
+		"Rate",
+		"Damp",
 		"Tube",
 	};
 
 	inline static const juce::StringArray PARAMETER_1_NAMES{
 		"-",
 		"Damping",
-		"Flanger",
-		"Chorus",
-		"Phaser",
-		"Delay",
+		"Depth",
+		"Depth",
+		"Depth",
+		"Time Left",
 		"Tube",
 	};
 
 	inline static const juce::StringArray PARAMETER_2_NAMES{
 		"-",
 		"Width",
-		"Flanger",
-		"Chorus",
-		"Phaser",
-		"Delay",
+		"Feedback",
+		"Centre Delay",
+		"Feedback",
+		"Time Right",
 		"Tube",
 	};
 
@@ -191,6 +191,7 @@ namespace customDsp {
 		virtual ~FX() {}
 
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
+			juce::ignoreUnused(spec);
 			jassertfalse;
 		}
 
@@ -208,7 +209,8 @@ namespace customDsp {
 		using FX::FX;
 	public:
 		virtual void reset() override {}
-		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workingBuffers) override {
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
+			juce::ignoreUnused(context, workBuffers);
 			return false;
 		}
 		virtual void prepareUpdate() {}
@@ -227,7 +229,7 @@ namespace customDsp {
 	private:
 
 		struct CombFilterData {
-			int startPos;
+			int startPos{ -1 };
 			int index{ 0 };
 			int size{ 0 };
 			float last{ 0.f };
@@ -240,7 +242,7 @@ namespace customDsp {
 			}
 		};
 		struct AllPassData {
-			int startPos;
+			int startPos{ -1 };
 			int index{ 0 };
 			int size{ 0 };
 			void update(const int t_startPos, const int t_size) {
@@ -248,35 +250,7 @@ namespace customDsp {
 				index = 0;
 				size = t_size;
 			}
-		};
-		class AllPassFilter {
-		public:
-			AllPassFilter() {}
-
-			void setSize(const int size) {
-				if (size != bufferSize) {
-					bufferIndex = 0;
-					buffer.malloc(size);
-					bufferSize = size;
-				}
-				clear();
-			}
-			void clear() {
-				buffer.clear((size_t)bufferSize);
-			}
-			float process(const float input) {
-				const float bufferedValue = buffer[bufferIndex];
-				float temp = input + bufferedValue * 0.5f;
-				buffer[bufferIndex] = temp;
-				bufferIndex = (bufferIndex + 1) % bufferSize;
-				return bufferedValue - input;
-			}
-		private:
-			juce::HeapBlock<float> buffer;
-			int bufferSize = 0, bufferIndex = 0;
-
-			JUCE_DECLARE_NON_COPYABLE(AllPassFilter)
-		};
+		};;
 
 		enum { numCombs = 4, numAllPasses = 2, numChannels = 2 }; // numCombs=8, numAllPasses = 4 before, but it was kinda slow
 		enum {
@@ -298,5 +272,134 @@ namespace customDsp {
 		inline static float MIN_LEVEL = juce::Decibels::decibelsToGain(-96.f);
 
 	};
+
+	class DelayLine {
+	public:
+		void setMaxDelay(int maxDelay) {
+			buffer.allocate(maxDelay, true);
+			bufferSize = maxDelay;
+			index = 0;
+		}
+		void reset() {
+			buffer.clear(bufferSize);
+		}
+		float process(float sample, float delay, float feedback) {
+			jassert(1.f <= delay && delay <= bufferSize);
+			jassert(-1.f < feedback && feedback < 1.f);
+			auto output = buffer[index];
+			buffer[index] = 0;
+			auto input = /*(1.f - std::abs(feedback)) **/ sample + feedback * output;
+			int delayOffset = static_cast<int>(delay);
+			float delayFrac = delay - delayOffset;
+			jassert(0.f <= delayFrac && delayFrac < 1.f);
+			buffer[(index + delayOffset) % bufferSize] += (1.f - delayFrac) * input;
+			buffer[(index + delayOffset + 1) % bufferSize] += delayFrac * input;
+			index = (index + 1) % bufferSize;
+			return output;
+		}
+	private:
+		juce::HeapBlock<float> buffer;
+		int bufferSize = -1;
+		int index = -1;
+	};
+
+	class Delay : public FX {
+		using FX::FX;
+	public:
+		virtual void prepareUpdate() override;
+		virtual void reset() override;
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+
+	private:
+		enum {
+			LEFT,
+			RIGHT
+		};
+		juce::SmoothedValue<float> delaySmoothed[2];
+		DelayLine delays[2]{};
+		static constexpr float maxDelaySec = 1.f;
+	};
+
+	class Flanger : public FX {
+		using FX::FX;
+	public:
+		virtual void prepareUpdate() override;
+		virtual void reset() override;
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+
+	private:
+		enum {
+			LEFT,
+			RIGHT
+		};
+		DelayLine delays[2];
+		LFO::SharedData lfoData{ "ERROR" };
+		LFO lfos[2]{ &lfoData,&lfoData };
+		juce::SmoothedValue<float> delaySmoothed[2];
+		juce::SmoothedValue<float> feedbackSmoothed[2];
+
+		static constexpr float minDelaySamples = 2.f;
+		static constexpr float maxDelayMSec = 20.f;
+	};
+
+	class Chorus : public FX {
+		using FX::FX;
+	public:
+		virtual void prepareUpdate() override;
+		virtual void reset() override;
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+
+	private:
+		enum {
+			LEFT,
+			RIGHT
+		};
+		DelayLine delays[2];
+		LFO::SharedData lfoData{ "ERROR" };
+		LFO lfos[2]{ &lfoData,&lfoData };
+		juce::SmoothedValue<float> delaySmoothed[2];
+
+		static constexpr float minDelayMSec = 7.f;
+		static constexpr float maxDelayMSec = 30.f;
+	};
+
+	class Phaser : public FX {
+		using FX::FX;
+	public:
+		virtual void prepareUpdate() override;
+		virtual void reset() override;
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+	private:
+		enum {
+			LEFT,
+			RIGHT
+		};
+		static constexpr int stages = 6;
+		float minCutoffs[stages]{ 16.f,33.f,48.f,98.f,160.f,260.f, };
+		float maxCutoffs[stages]{ 1600.f,3300.f,4800.f,9800.f,16000.f,22000.f, };
+		
+		float last[2]{ 0,0 };
+		LFO::SharedData lfoData{ "ERROR" };
+		LFO lfos[2]{ &lfoData,&lfoData };
+		float allpassS1[2][stages]{ 0 };
+
+		// FirstOrderTPTFilter from JUCE/Vadim Zavalishin
+		class AllpassFilter {
+		public:
+			float processSample(float input, float cutoff, float sampleRate) {
+				auto g = juce::dsp::FastMathApproximations::tan<float>(juce::MathConstants<float>::pi * cutoff / sampleRate);
+				auto G = g / (1 + g);
+				auto v = G * (input - s1);
+				auto y = v + s1;
+				s1 = y + v;
+				return 2 * y - input;
+			}
+
+		private:
+			float s1 = 0;
+
+		};
+	};
+
 
 }

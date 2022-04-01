@@ -155,6 +155,7 @@ namespace customDsp {
 
 		virtual void updateMode() = 0;
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
+			juce::ignoreUnused(spec);
 			jassertfalse;
 		}
 		virtual void prepareUpdate() = 0;
@@ -171,7 +172,9 @@ namespace customDsp {
 		using Filter::Filter;
 	public:
 		virtual void reset() override {}
-		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override { return false; }
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override { 
+			juce::ignoreUnused(context, workBuffers);
+			return false; }
 		virtual void prepareUpdate() {}
 	private:
 		void updateMode() override {}

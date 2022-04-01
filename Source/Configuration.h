@@ -50,6 +50,7 @@ namespace configuration {
 	extern const juce::String PARAMETER_0_SUFFIX;
 	extern const juce::String PARAMETER_1_SUFFIX;
 	extern const juce::String PARAMETER_2_SUFFIX;
+	extern const juce::String PAN_SUFFIX;
 
 	extern const juce::String WT_FOLDER_NAME;
 	extern const juce::String WT_FILE_EXTENSION;

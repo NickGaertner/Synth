@@ -98,7 +98,7 @@ bool customDsp::TPTFilter::process(juce::dsp::ProcessContextNonReplacing<float>&
 		auto end = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples());
 
 		auto currentCutoff = juce::jmap(juce::jlimit(0.f, 1.f, cutoffBase + cutoffMod * cutoffModSrc[start]), 100.f, 18000.f);
-		float g = juce::dsp::FastMathApproximations::tan(juce::MathConstants<float>::pi * currentCutoff / data->sampleRate);
+		float g = juce::dsp::FastMathApproximations::tan<float>(juce::MathConstants<float>::pi * currentCutoff / static_cast<float>(data->sampleRate));
 
 		auto currentResonance = juce::jmap(juce::jlimit(0.f, 1.f, resonanceBase + resonanceMod * resonanceModSrc[start]), 0.1f, 2.f);
 		float R2 = 1.0f / currentResonance;
@@ -120,7 +120,7 @@ bool customDsp::TPTFilter::process(juce::dsp::ProcessContextNonReplacing<float>&
 				auto yLP = yBP * g + ls2;
 				ls2 = yBP * g + yLP;
 
-				float value;
+				float value = 0.f;
 				switch (mode) { //actually not slow
 				case FilterType::TPT_LPF12: value = yLP; break;
 				case FilterType::TPT_BPF12: value = yBP; break;

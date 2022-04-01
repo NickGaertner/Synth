@@ -158,6 +158,16 @@ void SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 	buffer.clear();
 
 	synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+	auto masterGain = apvts.getRawParameterValue(configuration::MASTER_PREFIX + configuration::GAIN_SUFFIX)->load();
+	buffer.applyGain(masterGain);
+	auto magnitude = buffer.getMagnitude(0, buffer.getNumSamples());
+	if (magnitude >= 1.f) {
+		DBG("Hit 0dB :(");
+		buffer.applyGain(1.f / magnitude);
+	}
+	if (masterLevelCallback) {
+		masterLevelCallback(buffer.getMagnitude(0,0,buffer.getNumSamples()), buffer.getMagnitude(1, 0, buffer.getNumSamples()));
+	}
 	if (observationCallback) {
 		observationCallback(buffer);
 	}
@@ -213,7 +223,7 @@ void SynthAudioProcessor::initSynths()
 				voice->monoChain.addProcessor(data->createProcessor());
 			});
 
-		// fx
+		// fx & pan
 		std::for_each(processorData[configuration::OSC_NUMBER + 1].begin(), processorData[configuration::OSC_NUMBER + 1].end(),
 			[&](customDsp::Processor::SharedData* data) {
 				voice->stereoChain.addProcessor(data->createProcessor());
@@ -229,7 +239,6 @@ void SynthAudioProcessor::initSynths()
 	}
 
 	synth.addSound(new Synth::SynthSound{});
-
 	for (auto& dataArray : processorData) {
 		std::for_each(dataArray.begin(), dataArray.end(),
 			[&](customDsp::Processor::SharedData* data) {
@@ -242,7 +251,7 @@ juce::AudioProcessorValueTreeState::ParameterLayout SynthAudioProcessor::createP
 {
 	// DATA
 
-	// Create Processor::SharedData for the synth specific processors in the right order
+	// Create Processor::SharedData for the osc specific processors in the right order
 	for (auto i = 0; i < configuration::OSC_NUMBER; i++)
 	{
 		auto prefix = configuration::OSC_PREFIX + std::to_string(i);
@@ -250,20 +259,22 @@ juce::AudioProcessorValueTreeState::ParameterLayout SynthAudioProcessor::createP
 		processorData[i].add(new customDsp::Gain::SharedData{ prefix });
 	}
 
-	// Create Processor::SharedData for the synth independent processors in the right order
+	// Create Processor::SharedData for the osc independent processors in the right order
+	// Mono
 	for (auto i = 0; i < configuration::FILTER_NUMBER; i++) {
 		auto prefix = configuration::FILTER_PREFIX + std::to_string(i);
 		processorData[configuration::OSC_NUMBER].add(new customDsp::FilterChooser::SharedData{ prefix });
 	}
-
+	// stereo
 	for (auto i = 0; i < configuration::FX_NUMBER; i++) {
 		auto prefix = configuration::FX_PREFIX + std::to_string(i);
 		processorData[configuration::OSC_NUMBER + 1].add(new customDsp::FXChooser::SharedData{ prefix });
 	}
 
-	processorData[configuration::OSC_NUMBER + 2].add(new customDsp::DummyProcessor::SharedData{ configuration::PAN_PREFIX });
+	processorData[configuration::OSC_NUMBER + 1].add(new customDsp::Pan::SharedData{ configuration::PAN_PREFIX });
 
-	// TODO Master? (it's independant of the synths)
+	// Master
+	//processorData[configuration::OSC_NUMBER + 2].add(new customDsp::Gain::SharedData{ configuration::MASTER_PREFIX });
 
 	// Create Processor::SharedData for the modulation processors in the right order
 	for (auto i = 0; i < configuration::ENV_NUMBER; i++) {
@@ -286,6 +297,12 @@ juce::AudioProcessorValueTreeState::ParameterLayout SynthAudioProcessor::createP
 				data->addParams(layout);
 			});
 	}
+	// Master
+	layout.add(std::make_unique<juce::AudioParameterFloat>(
+		configuration::MASTER_PREFIX + configuration::GAIN_SUFFIX,
+		configuration::MASTER_PREFIX + configuration::GAIN_SUFFIX,
+		juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f, 1.f),
+		0.5f));
 
 	return layout;
 }

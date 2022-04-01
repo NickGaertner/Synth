@@ -206,7 +206,7 @@ namespace customGui {
 		static inline const int maxFFTOrder = 15;
 		int fftSize;
 		static inline const int maxFFTSize = 1 << maxFFTOrder;
-		static inline const int scopeSize = 1024;
+		static inline const int scopeSize = 512;
 
 		juce::dsp::FFT forwardFFT{ 1 };
 		std::unique_ptr<juce::dsp::WindowingFunction<float>> window;
@@ -228,7 +228,7 @@ namespace customGui {
 	public:
 		SynthModule() = delete;
 		SynthModule(SynthAudioProcessor& audioProcessor, int id, int cols = 2);
-		virtual ~SynthModule() override {}
+		virtual ~SynthModule() override {};
 
 		virtual void paint(juce::Graphics& g) override;
 		virtual void resized() override;
@@ -405,6 +405,119 @@ namespace customGui {
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LFOModule)
 	};
 
+	class PanModule : public SynthModule {
+	public:
+		PanModule() = delete;
+		PanModule(SynthAudioProcessor& audioProcessor, int id = 0);
+		virtual ~PanModule() override {}
+
+	protected:
+		NamedKnob panKnob{ "Pan" };
+		NamedKnob panModKnob{ "Mod" };
+		ModSrcChooser panModSrcChooser;
+	private:
+
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PanModule)
+	};
+
+	// inspired by https://github.com/Thrifleganger/level-meter-demo
+	class LevelMeter : public juce::Component, private juce::Timer {
+	public:
+		LevelMeter(float& valueRef) : value(valueRef) {
+			startTimerHz(30);
+		}
+
+		virtual void paint(juce::Graphics& g) override {
+			g.setColour(juce::Colours::black);
+			g.fillRect(getLocalBounds());
+			g.setGradientFill(gradient);
+			jassert(0.f <= value && value <= 1.f);
+			auto granularity = 100.f;
+			auto  quantized = juce::roundToInt(value * granularity) / granularity;
+			g.fillRect(getLocalBounds().removeFromBottom(getHeight() * quantized));
+		}
+
+		virtual void timerCallback() override {
+			repaint();
+		}
+		void resized() {
+			auto localBounds = getLocalBounds().toFloat();
+			gradient = juce::ColourGradient{ juce::Colours::green, localBounds.getBottomLeft(),
+											juce::Colours::red, localBounds.getTopLeft(),
+											false };
+			gradient.addColour(0.5, juce::Colours::greenyellow);
+			gradient.addColour(0.9, juce::Colours::yellow);
+		}
+	private:
+		float& value;
+		juce::ColourGradient gradient;
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LevelMeter)
+	};
+	class MasterModule : public SynthModule {
+	public:
+		MasterModule() = delete;
+		MasterModule(SynthAudioProcessor& audioProcessor, int id = 0);
+		virtual ~MasterModule() override {}
+
+	protected:
+		class LevelDisplay : public Component {
+		public:
+			LevelDisplay() {
+				vBox.items.addArray({
+					juce::FlexItem(hBox).withFlex(10.f),//.withMargin(juce::FlexItem::Margin(3.f)),
+					juce::FlexItem(meterLabel).withFlex(1.f),//.withMargin(juce::FlexItem::Margin(3.f)),
+					});
+				hBox.items.addArray({
+					juce::FlexItem(meterLeft).withFlex(1.f).withMargin(juce::FlexItem::Margin(3.f)),
+					juce::FlexItem(meterRight).withFlex(1.f).withMargin(juce::FlexItem::Margin(3.f)),
+					});
+				addAndMakeVisible(meterLeft);
+				addAndMakeVisible(meterRight);
+				addAndMakeVisible(meterLabel);
+				meterLabel.setJustificationType(juce::Justification::centred);
+				smoothedLeft.reset(20);
+				smoothedRight.reset(20);
+			}
+
+			void resized() {
+				vBox.performLayout(getLocalBounds());
+			}
+
+			void updateLevel(float t_left, float t_right) {
+				t_left = juce::jmap(juce::Decibels::gainToDecibels(t_left, -96.f), -96.f, 0.f, 0.f, 1.f);
+				t_right = juce::jmap(juce::Decibels::gainToDecibels(t_right, -96.f), -96.f, 0.f, 0.f, 1.f);
+				if (t_left > smoothedLeft.getCurrentValue()) {
+					smoothedLeft.setCurrentAndTargetValue(t_left);
+				}
+				else {
+					smoothedLeft.setTargetValue(t_left);
+				}
+				if (t_right > smoothedRight.getCurrentValue()) {
+					smoothedRight.setCurrentAndTargetValue(t_right);
+				}
+				else {
+					smoothedRight.setTargetValue(t_right);
+				}
+				levelLeft = smoothedLeft.getNextValue();
+				levelRight = smoothedRight.getNextValue();
+			}
+			juce::FlexBox vBox = Util::createVBox();
+			juce::FlexBox hBox = Util::createHBox();
+			juce::Label meterLabel{ "","Peak in dB" };
+			float levelLeft{ 0.f }, levelRight{ 0.f };
+			juce::SmoothedValue<float> smoothedLeft;
+			juce::SmoothedValue<float> smoothedRight;
+			LevelMeter meterLeft{ levelLeft };
+			LevelMeter meterRight{ levelRight };
+		} levelDisplay;
+
+		NamedKnob masterKnob{ "Master" };
+
+	private:
+
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MasterModule)
+	};
+
 	class SpectrumAnalyzerModule : public SynthModule {
 	public:
 		SpectrumAnalyzerModule() = delete;
@@ -436,8 +549,8 @@ namespace customGui {
 		ModuleHolder fxModuleHolder;
 		ModuleHolder envModuleHolder{ 2 };
 		ModuleHolder lfoModuleHolder{ 2 };
-		juce::Label panModule;
-		juce::Label masterModule;
+		PanModule panModule;
+		MasterModule masterModule;
 		SpectrumAnalyzerModule spectrumModule;
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthComponent)
