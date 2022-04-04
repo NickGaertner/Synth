@@ -96,7 +96,7 @@ void customDsp::Reverb::prepareUpdate()
 	}
 	allPassBuffer[LEFT].allocate(leftAllPassBufferSize, true);
 	allPassBuffer[RIGHT].allocate(rightAllPassBufferSize, true);
-
+	
 	// Here was SmoothedValue stuff
 }
 void customDsp::Reverb::reset() {
@@ -174,10 +174,12 @@ bool customDsp::Reverb::process(juce::dsp::ProcessContextNonReplacing<float>& co
 		const float wetGain1 = 0.5f * wet * (1.f + currentWidth);
 		const float wetGain2 = 0.5f * wet * (1.f - currentWidth);
 
+		outputBlock.getSubBlock(blockStart, length).multiplyBy(dryGain);
 		// Do calculations first for the left and then for the right side to increase data locality
 		// and decrease the needed work buffers
 		for (int n = LEFT; n <= RIGHT; n++) {
 			auto currentOutWB = outWB.getSubBlock(blockStart, length);
+
 			currentOutWB.clear();
 			// accumulate comb filter in parallel
 			for (int c = 0; c < numCombs; c++) {
@@ -224,14 +226,14 @@ bool customDsp::Reverb::process(juce::dsp::ProcessContextNonReplacing<float>& co
 				allPassData[n][a].index = bufferIndex;
 			}
 			// mix down
-			outputBlock.getSubBlock(blockStart, length).multiplyBy(dryGain);
+			
 			outputBlock.getSingleChannelBlock(n).getSubBlock(blockStart, length).addProductOf(currentOutWB, wetGain1);
 			outputBlock.getSingleChannelBlock((n + 1) % 2).getSubBlock(blockStart, length).addProductOf(currentOutWB, wetGain2);
 		}
 	}
 	//JUCE_END_IGNORE_WARNINGS_MSVC
 
-	return (MIN_LEVEL < outputBlock.getSample(LEFT, 0)) || (MIN_LEVEL < outputBlock.getSample(LEFT, static_cast<int>(numSamples - 1)));
+	return true; // TODO
 }
 
 void customDsp::Delay::prepareUpdate()
@@ -317,7 +319,12 @@ bool customDsp::Delay::process(juce::dsp::ProcessContextNonReplacing<float>& con
 		}
 	}
 
-	return true; // TODO
+	if (isNoteOn) {
+		return true;
+	}
+	else {
+		return !delays[LEFT].isEmpty() || !delays[RIGHT].isEmpty(); // TODO: bad and expensive condition...
+	}
 }
 
 void customDsp::Flanger::prepareUpdate()
@@ -419,7 +426,7 @@ bool customDsp::Flanger::process(juce::dsp::ProcessContextNonReplacing<float>& c
 		}
 	}
 
-	return true; // TODO
+	return isNoteOn;
 }
 
 void customDsp::Chorus::prepareUpdate()
@@ -441,6 +448,9 @@ void customDsp::Chorus::reset()
 		l.reset();
 	}
 	lfos[RIGHT].advancePhase(juce::MathConstants<float>::halfPi);
+	for (auto& s : centreDelaySmoothed) {
+		s.setCurrentAndTargetValue(((maxDelayMSec + minDelayMSec) / 2.f) * data->sampleRate / 1000.f);
+	}
 	for (auto& s : delaySmoothed) {
 		s.setCurrentAndTargetValue(((maxDelayMSec + minDelayMSec) / 2.f) * data->sampleRate / 1000.f);
 	}
@@ -503,21 +513,25 @@ bool customDsp::Chorus::process(juce::dsp::ProcessContextNonReplacing<float>& co
 			lfoValues.clear();
 			lfos[channel].process(lfoContext, emptyBlock);
 
+			centreDelaySmoothed[channel].reset(length);
 			delaySmoothed[channel].reset(length);
 
-			delaySmoothed[channel].setTargetValue(juce::jlimit(minDelaySamples, maxDelaySamples,
-				centreDelay + normalizedDepth * (delayRange / 2.f) * lfoValues.getSample(0, length - 1)));
+			centreDelaySmoothed[channel].setTargetValue(centreDelay);
+			delaySmoothed[channel].setTargetValue(juce::jlimit(minDelaySamples - centreDelay, maxDelaySamples - centreDelay,
+				normalizedDepth * (delayRange / 2.f) * lfoValues.getSample(0, length - 1)));
 
 			auto outputChannel = outputBlock.getChannelPointer(channel);
 			auto& delay = delays[channel];
 			for (int i = blockStart; i < end; i++) {
+				auto currentDelay = juce::jlimit(minDelaySamples, maxDelaySamples,
+					centreDelaySmoothed[channel].getNextValue() + delaySmoothed[channel].getNextValue());
 				outputChannel[i] +=
-					dryWet * (delay.process(outputChannel[i], delaySmoothed[channel].getNextValue(), 0.f) - outputChannel[i]);
+					dryWet * (delay.process(outputChannel[i], currentDelay, 0.f) - outputChannel[i]);
 			}
 		}
 	}
 
-	return true; // TODO
+	return isNoteOn; 
 }
 
 
@@ -618,7 +632,7 @@ bool customDsp::Phaser::process(juce::dsp::ProcessContextNonReplacing<float>& co
 		}
 	}
 
-	return true; // TODO
+	return isNoteOn; // TODO
 }
 
 void customDsp::Tube::prepareUpdate() {
@@ -705,7 +719,7 @@ bool customDsp::Tube::process(juce::dsp::ProcessContextNonReplacing<float>& cont
 	}
 	outputBlock.multiplyBy(originalMagnitude);
 
-	return true; // TODO
+	return isNoteOn; // TODO
 }
 
 void customDsp::Distortion::prepareUpdate() {
@@ -798,5 +812,5 @@ bool customDsp::Distortion::process(juce::dsp::ProcessContextNonReplacing<float>
 	jassert(newMagnitude != 0.f);
 	outputBlock.multiplyBy(originalMagnitude / newMagnitude);
 
-	return true; // TODO
+	return isNoteOn; // TODO
 }

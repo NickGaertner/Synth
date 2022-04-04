@@ -214,6 +214,7 @@ namespace wavetable {
 			case GeneratableWt::SquareHarmonics:  wtPtr = new SquareHarmonicsWavetable(GENERATABLE_WT_NAMES[nameIndex], 44100.0); break;
 			case GeneratableWt::PWM:  wtPtr = new PWMWavetable(GENERATABLE_WT_NAMES[nameIndex], 44100.0); break;
 			case GeneratableWt::Trapez:  wtPtr = new TrapezWavetable(GENERATABLE_WT_NAMES[nameIndex], 44100.0); break;
+			case GeneratableWt::WhiteNoise:  wtPtr = new WhiteNoiseWavetable(GENERATABLE_WT_NAMES[nameIndex], 44100.0); break;
 			default: jassertfalse; break;
 			}
 			// write the wavetable to the file so it can be easily loaded the next time it's needed
@@ -323,6 +324,31 @@ namespace wavetable {
 					channel[sample] = (triangleChannel[sample]
 						+ triangleChannel[(sample + (int)(wtPosition * defaultWtResolution / 2.f)) % defaultWtResolution])
 						/ (2.f * (1.f - wtPosition));
+				}
+				// for wrap condition
+				channel[defaultWtResolution] = channel[0];
+
+				// normalize
+				wt.applyGain(i, 0, defaultWtResolution + 1, 1.0 / wt.getMagnitude(i, 0, defaultWtResolution + 1));
+			}
+
+			// last channel can be left empty/uninitialized since it won't be accessed
+		}
+	}
+
+	void WhiteNoiseWavetable::create(double sampleRate)
+	{
+		juce::Random random{};
+		// TODO make 63 a constant and refactor code
+		for (int exponent = 4; exponent <= 14; exponent++) {
+			tables[exponent - 4] = juce::AudioBuffer<float>(5 + 1, defaultWtResolution + 1);
+			auto& wt = tables[exponent - 4];
+
+			for (int i = 0; i < 5; i++) {
+				auto* channel = wt.getWritePointer(i);
+
+				for (int sample = 0; sample < defaultWtResolution; sample++) {
+					channel[sample] = (random.nextFloat() * 2.f) - 1.f;
 				}
 				// for wrap condition
 				channel[defaultWtResolution] = channel[0];

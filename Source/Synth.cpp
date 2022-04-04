@@ -34,10 +34,12 @@ namespace Synth {
 
 	void SynthVoice::startNote(int midiNoteNumber, float velocity, juce::SynthesiserSound* t_sound, int currentPitchWheelPosition)
 	{
-		juce::ignoreUnused(t_sound, currentPitchWheelPosition);
+		juce::ignoreUnused(t_sound);
+		auto freq = static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber))
+			* pitchWheelToFactor(currentPitchWheelPosition);
 		for (auto& p : oscChains) {
 			auto osc = dynamic_cast<customDsp::InterpolationOsc*>(p.getProcessor(0));
-			osc->setFrequency((float)juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber), true);
+			osc->setFrequency(freq, true);
 			osc->setVelocity(velocity);
 			p.noteOn();
 		}
@@ -62,7 +64,13 @@ namespace Synth {
 
 	void SynthVoice::pitchWheelMoved(int newPitchWheelValue)
 	{
-		juce::ignoreUnused(newPitchWheelValue);
+		auto midiNoteNumber = getCurrentlyPlayingNote();
+		auto freq = static_cast<float>(juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber)) 
+					* pitchWheelToFactor(newPitchWheelValue);
+		for (auto& p : oscChains) {
+			auto osc = dynamic_cast<customDsp::InterpolationOsc*>(p.getProcessor(0));
+			osc->setFrequency(freq, false);
+		}
 	}
 
 	void SynthVoice::controllerMoved(int controllerNumber, int newControllerValue)
@@ -85,7 +93,7 @@ namespace Synth {
 		auto monoBlock = outputBlock.getSingleChannelBlock(0);
 		auto tmpMonoBlock = outputBlock.getSingleChannelBlock(1);
 
-		auto workBlock = tmpAudioBlock.getSubsetChannelBlock(numChannels , customDsp::WORK_BUFFERS)
+		auto workBlock = tmpAudioBlock.getSubsetChannelBlock(numChannels, customDsp::WORK_BUFFERS)
 			.getSubBlock(0, numSamples);
 		workBlock.clear();
 
@@ -95,10 +103,10 @@ namespace Synth {
 		inputBlock.clear();
 
 		juce::dsp::ProcessContextNonReplacing<float> modulationContext{ juce::dsp::AudioBlock<float>{},inputBlock };
-		juce::dsp::ProcessContextNonReplacing<float> oscContext{ inputBlock, tmpMonoBlock};
-		juce::dsp::ProcessContextNonReplacing<float> monoContext{ inputBlock, monoBlock};
+		juce::dsp::ProcessContextNonReplacing<float> oscContext{ inputBlock, tmpMonoBlock };
+		juce::dsp::ProcessContextNonReplacing<float> monoContext{ inputBlock, monoBlock };
 		juce::dsp::ProcessContextNonReplacing<float> stereoContext{ inputBlock, outputBlock };
-		
+
 		// fill inputBlock with modulation signals
 		bool needMoreTime = modulationProcessors.process(modulationContext, workBlock);
 
@@ -109,14 +117,14 @@ namespace Synth {
 			tmpMonoBlock.clear();
 		}
 
-		// process mono stuff (filters)
+		//// process mono stuff (filters)
 		needMoreTime |= monoChain.process(monoContext, workBlock);
-		
+
 		// copy the mono signal to all other channels (which should only be one)
 		for (int channel = 1; channel < numChannels; channel++) {
 			outputBlock.getSingleChannelBlock(channel).copyFrom(monoBlock);
 		}
-		// process stereo stuff (fx)
+		//// process stereo stuff (fx)
 		needMoreTime |= stereoChain.process(stereoContext, workBlock);
 
 		// add result from temporary block to the output buffer

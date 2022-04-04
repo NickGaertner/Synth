@@ -320,6 +320,7 @@ namespace customDsp {
 		virtual void reset() override {
 			phase.reset();
 			shouldStopCleanly = false;
+			currentReleaseSamples = 0;
 		}
 
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
@@ -339,11 +340,13 @@ namespace customDsp {
 		}
 
 		virtual void noteOff() {
-			Processor::noteOff();
-			if (!data->modParams[SharedData::ENV].isActive()) {
+			if (isNoteOn && !data->modParams[SharedData::ENV].isActive()) {
 				shouldStopCleanly = true;
+				currentReleaseSamples = maxReleaseSamples;
 			}
+			Processor::noteOff();
 		};
+
 	private:
 		SharedData* data;
 
@@ -351,7 +354,8 @@ namespace customDsp {
 		float velocity = 0.f;
 		juce::dsp::Phase<float> phase;
 		bool shouldStopCleanly = false;
-
+		static constexpr int maxReleaseSamples = 500;
+		int currentReleaseSamples = 0;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InterpolationOsc);
 	};
 

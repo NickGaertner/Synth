@@ -150,35 +150,32 @@ namespace customDsp {
 			multiplier *= 0.25f * velocity;
 			workBuffers.getSingleChannelBlock(0).getSubBlock(start, end - start).multiplyBy(multiplier);
 		}
+
 		// prevent clicking when stopping without an envelope
 		if (shouldStopCleanly) {
-			shouldStopCleanly = false;
 			auto numSamples = workBuffers.getNumSamples();
+			auto samplesToFade = juce::jmin(currentReleaseSamples, static_cast<int>(numSamples));
 			auto* channelPtr = workBuffers.getChannelPointer(0);
-			for (int i = numSamples - 1; i >= 0; i--) {
-				channelPtr[i] *= (numSamples - i) / static_cast<float>(numSamples);
+			float maxReleaseSamples2f = maxReleaseSamples * maxReleaseSamples;
+			for (int i = 0; i < samplesToFade; i++) {
+				channelPtr[i] *= currentReleaseSamples * currentReleaseSamples / maxReleaseSamples2f;
+				currentReleaseSamples--;
+			}
+			jassert(0 <= currentReleaseSamples);
+			if (currentReleaseSamples == 0) {
+				shouldStopCleanly = false;
+				for (int i = samplesToFade; i < numSamples; i++) {
+					channelPtr[i] = 0.f;
+				}
 			}
 
-			//auto minMag = 2.f;
-			//auto minMagPos = -1;
-			//auto* channelPtr = workBuffers.getChannelPointer(0);
-			//for (int i = workBuffers.getNumSamples()-1; i >= 0; i--) {
-			//	auto mag = std::fabs(channelPtr[i]);
-			//	if (mag < minMag) {
-			//		minMag = mag;
-			//		minMagPos = i;
-			//		if (minMag < 0.0001f) { // TODO Threshold
-			//			break;
-			//		}
-			//	}
-			//}
-			//workBuffers.getSingleChannelBlock(0).getSubBlock(minMagPos).fill(0.f);
 		}
+
 		for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
 			outputBlock.getSingleChannelBlock(channel).add(workBuffers.getSingleChannelBlock(0));
 		}
 
-		return isNoteOn;
+		return isNoteOn || shouldStopCleanly;
 	};
 
 	bool LFO::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
@@ -235,7 +232,7 @@ namespace customDsp {
 			auto end = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples());
 
 			gainSmoothed.reset(end - start);
-			gainSmoothed.setTargetValue(baseGain + gainMod * gainModSrc[end]);
+			gainSmoothed.setTargetValue(juce::jlimit(0.f,1.f,baseGain + gainMod * gainModSrc[end]));
 
 			for (int i = start; i < end; i++) {
 				workPtr[i] = gainSmoothed.getNextValue();

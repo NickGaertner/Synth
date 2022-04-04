@@ -39,6 +39,11 @@ namespace Synth
 
 	private:
 
+		inline static float pitchWheelToFactor(int pitchWheelPos) {
+			auto normalizedPos = (pitchWheelPos - 0x2000) / static_cast<float>(0x2000);
+			return std::exp2f(2 * normalizedPos / 12.f);
+		}
+
 		juce::HeapBlock<char> heapBlock;
 		juce::dsp::AudioBlock<float> tmpAudioBlock;
 
@@ -47,7 +52,7 @@ namespace Synth
 
 	class SynthSound : public juce::SynthesiserSound {
 	public:
-		SynthSound(){}
+		SynthSound() {}
 
 		virtual bool appliesToNote(int midiNoteNumber) override;
 		virtual bool appliesToChannel(int midiChannel) override;

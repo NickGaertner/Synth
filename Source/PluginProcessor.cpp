@@ -152,12 +152,14 @@ bool SynthAudioProcessor::isBusesLayoutSupported(const BusesLayout& layouts) con
 
 void SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
 {
+
 	performanceCounter.start();
 	juce::ScopedNoDenormals noDenormals;
 
 	buffer.clear();
 
 	synth.renderNextBlock(buffer, midiMessages, 0, buffer.getNumSamples());
+
 	auto masterGain = apvts.getRawParameterValue(configuration::MASTER_PREFIX + configuration::GAIN_SUFFIX)->load();
 	buffer.applyGain(masterGain);
 	auto magnitude = buffer.getMagnitude(0, buffer.getNumSamples());
@@ -172,6 +174,7 @@ void SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 		observationCallback(buffer);
 	}
 	performanceCounter.stop();
+
 }
 
 //==============================================================================

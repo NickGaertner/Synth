@@ -302,6 +302,14 @@ namespace customDsp {
 			index = (index + 1) % bufferSize;
 			return output;
 		}
+		bool isEmpty() {
+			for (int i = 0; i < bufferSize; i++) {
+				if (buffer[i] != 0.f) {
+					return false;
+				}
+			}
+			return true;
+		}
 	private:
 		juce::HeapBlock<float> buffer;
 		int bufferSize = -1;
@@ -363,6 +371,7 @@ namespace customDsp {
 		LFO::SharedData lfoData{ "ERROR" };
 		LFO lfos[2]{ &lfoData,&lfoData };
 		juce::SmoothedValue<float> delaySmoothed[2];
+		juce::SmoothedValue<float> centreDelaySmoothed[2];
 
 		static constexpr float minDelayMSec = 7.f;
 		static constexpr float maxDelayMSec = 30.f;

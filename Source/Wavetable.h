@@ -94,6 +94,7 @@ namespace wavetable {
 			SquareHarmonics,
 			PWM,
 			Trapez,
+			WhiteNoise,
 			TotalNumber,
 		};
 		const juce::StringArray GENERATABLE_WT_NAMES{
@@ -102,6 +103,7 @@ namespace wavetable {
 			"SquareHarmonics",
 			"PWM",
 			"Trapez",
+			"WhiteNoise",
 		};
 
 		JUCE_DECLARE_NON_COPYABLE(WavetableCache)
@@ -164,5 +166,16 @@ namespace wavetable {
 
 	private:
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TrapezWavetable)
+	};
+
+	class WhiteNoiseWavetable : public Wavetable {
+	public:
+		WhiteNoiseWavetable(const juce::String& t_name, double sampleRate) : Wavetable(t_name) {
+			create(sampleRate);
+		}
+		virtual void create(double sampleRate);
+
+	private:
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WhiteNoiseWavetable)
 	};
 }
