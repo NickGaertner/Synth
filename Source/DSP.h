@@ -319,6 +319,7 @@ namespace customDsp {
 
 		virtual void reset() override {
 			phase.reset();
+			shouldStopCleanly = false;
 		}
 
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
@@ -336,12 +337,20 @@ namespace customDsp {
 		int getEnvChannel() {
 			return data->modParams[SharedData::ENV].src_channel;
 		}
+
+		virtual void noteOff() {
+			Processor::noteOff();
+			if (!data->modParams[SharedData::ENV].isActive()) {
+				shouldStopCleanly = true;
+			}
+		};
 	private:
 		SharedData* data;
 
 		float frequency = 440.f;
 		float velocity = 0.f;
 		juce::dsp::Phase<float> phase;
+		bool shouldStopCleanly = false;
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(InterpolationOsc);
 	};
@@ -484,13 +493,14 @@ namespace customDsp {
 		};
 
 		virtual void reset() override {
+			gainSmoothed.setCurrentAndTargetValue(data->gain);
 		}
 
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
 
 	private:
 		SharedData* data;
-
+		juce::SmoothedValue<float> gainSmoothed;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Gain);
 	};
 

@@ -7,9 +7,10 @@ void customDsp::FXChooser::createFX(FXType type)
 	case FXType::CHORUS: fx = std::make_unique<Chorus>(data); break;
 	case FXType::DELAY: fx = std::make_unique<Delay>(data); break;
 	case FXType::FLANGER: fx = std::make_unique<Flanger>(data); break;
-	case FXType::TUBE: fx = std::make_unique<DummyFX>(data); break;
+	case FXType::TUBE: fx = std::make_unique<Tube>(data); break;
 	case FXType::REVERB: fx = std::make_unique<Reverb>(data); break;
 	case FXType::PHASER: fx = std::make_unique<Phaser>(data); break;
+	case FXType::DISTORTION: fx = std::make_unique<Distortion>(data); break;
 	case FXType::NONE: fx = std::make_unique<DummyFX>(data); break;
 	default: jassertfalse; break;
 	}
@@ -281,29 +282,37 @@ bool customDsp::Delay::process(juce::dsp::ProcessContextNonReplacing<float>& con
 	auto timeRightMod = data->modParams[FXChooser::SharedData::PARAMETER_2].factor;
 	auto timeRightModSrc = inputBlock.getChannelPointer((size_t)data->modParams[FXChooser::SharedData::PARAMETER_2].src_channel);
 
+	juce::SmoothedValue<float> delayInSamples[2];
+	delayInSamples[LEFT].setCurrentAndTargetValue(
+		juce::jmap(juce::jlimit(0.f, 1.f, timeLeftBase + timeLeftMod * timeLeftModSrc[0]),
+			2.f, maxDelaySec * static_cast<float>(data->sampleRate)));
+	delayInSamples[RIGHT].setCurrentAndTargetValue(
+		juce::jmap(juce::jlimit(0.f, 1.f, timeRightBase + timeRightMod * timeRightModSrc[0]),
+			2.f, maxDelaySec * static_cast<float>(data->sampleRate)));
+
 	for (int blockStart = 0; blockStart < numSamples; blockStart += configuration::MOD_BLOCK_SIZE) {
 		auto end = juce::jmin(blockStart + configuration::MOD_BLOCK_SIZE, (int)numSamples);
 		auto length = end - blockStart;
 
-		auto dryWet = dryWetBase + dryWetMod * dryWetModSrc[blockStart];
-		auto damp = dampBase + dampMod * dampModSrc[blockStart];
+		auto dryWet = juce::jlimit(0.f, 1.f, dryWetBase + dryWetMod * dryWetModSrc[blockStart]);
+		auto damp = juce::jlimit(0.f, 1.f, dampBase + dampMod * dampModSrc[blockStart]);
 
-		float delayInSamples[2]{
-			juce::jmap(juce::jlimit(0.f,1.f,timeLeftBase + timeLeftMod * timeLeftModSrc[blockStart]),
-					2.f, maxDelaySec * static_cast<float>(data->sampleRate)),
-			juce::jmap(juce::jlimit(0.f,1.f,timeRightBase + timeRightMod * timeRightModSrc[blockStart]),
-					2.f, maxDelaySec * static_cast<float>(data->sampleRate)),
-		};
-		//delaySmoothed[LEFT].reset(length);
-		//delaySmoothed[RIGHT].reset(length);
-		//delaySmoothed[LEFT].setTargetValue(delayInSamples[LEFT]);
-		//delaySmoothed[RIGHT].setTargetValue(delayInSamples[RIGHT]);
+		delayInSamples[LEFT].setTargetValue(
+			juce::jmap(juce::jlimit(0.f, 1.f, timeLeftBase + timeLeftMod * timeLeftModSrc[end]),
+				2.f, maxDelaySec * static_cast<float>(data->sampleRate)));
+		delayInSamples[RIGHT].setTargetValue(
+			juce::jmap(juce::jlimit(0.f, 1.f, timeRightBase + timeRightMod * timeRightModSrc[end]),
+				2.f, maxDelaySec * static_cast<float>(data->sampleRate)));
+		delayInSamples[LEFT].reset(length);
+		delayInSamples[RIGHT].reset(length);
+
 
 		for (int channel = LEFT; channel <= RIGHT; channel++) {
 			auto& delay = delays[channel];
 			auto outputChannel = outputBlock.getChannelPointer(channel);
 			for (int i = blockStart; i < end; i++) {
-				outputChannel[i] += dryWet * ((1.f - damp) * delay.process(outputChannel[i], delayInSamples[channel], 0.f) - outputChannel[i]);
+				outputChannel[i] += dryWet * ((1.f - damp) * delay.process(outputChannel[i], delayInSamples[channel].getNextValue(), 0.f)
+					- outputChannel[i]);
 			}
 		}
 	}
@@ -377,7 +386,7 @@ bool customDsp::Flanger::process(juce::dsp::ProcessContextNonReplacing<float>& c
 		auto end = juce::jmin(blockStart + configuration::MOD_BLOCK_SIZE, (int)numSamples);
 		auto length = end - blockStart;
 
-		auto dryWet = dryWetBase + dryWetMod * dryWetModSrc[blockStart];
+		auto dryWet = juce::jlimit(0.f, 1.f, dryWetBase + dryWetMod * dryWetModSrc[blockStart]);
 		auto normalizedRate = juce::jlimit(0.f, 1.f, rateBase + rateMod * rateModSrc[blockStart]);
 		auto depth = juce::jlimit(0.f, 1.f, depthBase + depthMod * depthModSrc[blockStart]);
 		auto normalizedFeedback = juce::jlimit(0.f, 1.f, feedbackBase + feedbackMod * feedbackModSrc[blockStart]);
@@ -479,7 +488,7 @@ bool customDsp::Chorus::process(juce::dsp::ProcessContextNonReplacing<float>& co
 		auto end = juce::jmin(blockStart + configuration::MOD_BLOCK_SIZE, (int)numSamples);
 		auto length = end - blockStart;
 
-		auto dryWet = dryWetBase + dryWetMod * dryWetModSrc[blockStart];
+		auto dryWet = juce::jlimit(0.f, 1.f, dryWetBase + dryWetMod * dryWetModSrc[blockStart]);
 		auto normalizedRate = juce::jlimit(0.f, 1.f, rateBase + rateMod * rateModSrc[blockStart]);
 		auto normalizedDepth = juce::jlimit(0.f, 1.f, depthBase + depthMod * depthModSrc[blockStart]);
 		auto normalizedCentreDelay = juce::jlimit(0.f, 1.f, centreDelayBase + centreDelayMod * centreDelayModSrc[blockStart]);
@@ -568,7 +577,7 @@ bool customDsp::Phaser::process(juce::dsp::ProcessContextNonReplacing<float>& co
 		auto end = juce::jmin(blockStart + configuration::MOD_BLOCK_SIZE, (int)numSamples);
 		auto length = end - blockStart;
 
-		auto dryWet = dryWetBase + dryWetMod * dryWetModSrc[blockStart];
+		auto dryWet = juce::jlimit(0.f, 1.f, dryWetBase + dryWetMod * dryWetModSrc[blockStart]);
 		auto normalizedRate = juce::jlimit(0.f, 1.f, rateBase + rateMod * rateModSrc[blockStart]);
 		auto normalizedDepth = juce::jlimit(0.f, 1.f, depthBase + depthMod * depthModSrc[blockStart]);
 		auto feedback = juce::jlimit(0.f, 0.9f, feedbackBase + feedbackMod * feedbackModSrc[blockStart]);
@@ -608,6 +617,186 @@ bool customDsp::Phaser::process(juce::dsp::ProcessContextNonReplacing<float>& co
 			}
 		}
 	}
+
+	return true; // TODO
+}
+
+void customDsp::Tube::prepareUpdate() {
+}
+void customDsp::Tube::reset() {
+}
+
+bool customDsp::Tube::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) {
+
+	if (data->bypassed || context.isBypassed) {
+		return false;
+	}
+
+	auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
+	auto& outputBlock = context.getOutputBlock();
+	const auto numSamples = outputBlock.getNumSamples();
+
+	//jassert(workBuffers.getNumChannels() >= 1);
+	jassert(data->numChannels == 2);
+	jassert(outputBlock.getNumChannels() == 2);
+
+	// prepare modulation
+	auto dryWetBase = data->dryWet;
+	auto dryWetMod = data->modParams[FXChooser::SharedData::DRY_WET].factor;
+	auto dryWetModSrc = inputBlock.getChannelPointer((size_t)data->modParams[FXChooser::SharedData::DRY_WET].src_channel);
+
+	// parameter0 = kPos
+	auto kPosBase = data->parameter0;
+	auto kPosMod = data->modParams[FXChooser::SharedData::PARAMETER_0].factor;
+	auto kPosModSrc = inputBlock.getChannelPointer((size_t)data->modParams[FXChooser::SharedData::PARAMETER_0].src_channel);
+	// parameter1 = kNeg
+	auto kNegBase = data->parameter1;
+	auto kNegMod = data->modParams[FXChooser::SharedData::PARAMETER_1].factor;
+	auto kNegModSrc = inputBlock.getChannelPointer((size_t)data->modParams[FXChooser::SharedData::PARAMETER_1].src_channel);
+	// parameter2 = stages
+	auto stagesBase = data->parameter2;
+	auto stagesMod = data->modParams[FXChooser::SharedData::PARAMETER_2].factor;
+	auto stagesModSrc = inputBlock.getChannelPointer((size_t)data->modParams[FXChooser::SharedData::PARAMETER_2].src_channel);
+
+	auto emptyBlock = juce::dsp::AudioBlock<float>();
+
+	auto minMax = outputBlock.findMinAndMax();
+	auto originalMagnitude = juce::jmax(std::abs(minMax.getStart()), std::abs(minMax.getEnd()));
+	if (originalMagnitude != 0.f) {
+		outputBlock.multiplyBy(1.f / originalMagnitude);
+	}
+	else {
+		return false;
+	}
+
+	for (int blockStart = 0; blockStart < numSamples; blockStart += configuration::MOD_BLOCK_SIZE) {
+		auto end = juce::jmin(blockStart + configuration::MOD_BLOCK_SIZE, (int)numSamples);
+		auto length = end - blockStart;
+
+		auto dryWet = dryWetBase + dryWetMod * dryWetModSrc[blockStart];
+		auto kPos = 1 + juce::jlimit(0.f, 1.f, kPosBase + kPosMod * kPosModSrc[blockStart]) * (maxK - 1);
+		auto kNeg = 1 + juce::jlimit(0.f, 1.f, kNegBase + kNegMod * kNegModSrc[blockStart]) * (maxK - 1);
+		int stages = 1 + juce::jlimit(0.f, 1.f, stagesBase + stagesMod * stagesModSrc[blockStart]) * (maxStages - 1);
+		auto kPosArctan = fastArctan(kPos);
+		auto kNegArctan = fastArctan(kNeg);
+
+		for (int channel = 0; channel < outputBlock.getNumChannels(); channel++) {
+
+			auto outputChannel = outputBlock.getChannelPointer(channel);
+			for (int i = blockStart; i < end; i++) {
+				auto input = outputChannel[i];
+				for (int n = 0; n < stages; n++) {
+					jassert(std::abs(input) <= 1.001f);
+					float k;
+					float kArctan;
+					if (input < 0.f) {
+						k = kNeg;
+						kArctan = kNegArctan;
+					}
+					else {
+						k = kPos;
+						kArctan = kPosArctan;
+					}
+					input = -fastArctan(k * input) / kArctan;
+				}
+				outputChannel[i] += dryWet * (input - outputChannel[i]);
+			}
+		}
+	}
+	outputBlock.multiplyBy(originalMagnitude);
+
+	return true; // TODO
+}
+
+void customDsp::Distortion::prepareUpdate() {
+}
+void customDsp::Distortion::reset() {
+	filterS1[0] = 0.f;
+	filterS1[1] = 0.f;
+}
+
+bool customDsp::Distortion::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) {
+
+	if (data->bypassed || context.isBypassed) {
+		return false;
+	}
+
+	auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
+	auto& outputBlock = context.getOutputBlock();
+	const auto numSamples = outputBlock.getNumSamples();
+
+	//jassert(workBuffers.getNumChannels() >= 1);
+	jassert(data->numChannels == 2);
+	jassert(outputBlock.getNumChannels() == 2);
+
+	// prepare modulation
+	auto dryWetBase = data->dryWet;
+	auto dryWetMod = data->modParams[FXChooser::SharedData::DRY_WET].factor;
+	auto dryWetModSrc = inputBlock.getChannelPointer((size_t)data->modParams[FXChooser::SharedData::DRY_WET].src_channel);
+
+	// parameter0 = cutoff
+	auto cutoffBase = data->parameter0;
+	auto cutoffMod = data->modParams[FXChooser::SharedData::PARAMETER_0].factor;
+	auto cutoffModSrc = inputBlock.getChannelPointer((size_t)data->modParams[FXChooser::SharedData::PARAMETER_0].src_channel);
+	// parameter1 = filterPos
+	auto filterPosBase = data->parameter1;
+	auto filterPosMod = data->modParams[FXChooser::SharedData::PARAMETER_1].factor;
+	auto filterPosModSrc = inputBlock.getChannelPointer((size_t)data->modParams[FXChooser::SharedData::PARAMETER_1].src_channel);
+	// parameter2 = steepness
+	auto kBase = data->parameter2;
+	auto kMod = data->modParams[FXChooser::SharedData::PARAMETER_2].factor;
+	auto kModSrc = inputBlock.getChannelPointer((size_t)data->modParams[FXChooser::SharedData::PARAMETER_2].src_channel);
+
+	auto emptyBlock = juce::dsp::AudioBlock<float>();
+
+	auto minMax = outputBlock.findMinAndMax();
+	auto originalMagnitude = juce::jmax(std::abs(minMax.getStart()), std::abs(minMax.getEnd()));
+	if (originalMagnitude != 0.f) {
+		outputBlock.multiplyBy(1.f / originalMagnitude);
+	}
+	else {
+		return false;
+	}
+
+	for (int blockStart = 0; blockStart < numSamples; blockStart += configuration::MOD_BLOCK_SIZE) {
+		auto end = juce::jmin(blockStart + configuration::MOD_BLOCK_SIZE, (int)numSamples);
+		auto length = end - blockStart;
+
+		auto dryWet = juce::jlimit(0.f, 1.f, dryWetBase + dryWetMod * dryWetModSrc[blockStart]);
+		auto normalizedCutoff = juce::jlimit(0.f, 1.f, cutoffBase + cutoffMod * cutoffModSrc[blockStart]);
+		auto filterPos = juce::jlimit(0.f, 1.f, filterPosBase + filterPosMod * filterPosModSrc[blockStart]);
+		float k = 1.f + juce::jlimit(0.f, 1.f, kBase + kMod * kModSrc[blockStart]) * 4.f;
+		auto feedback = juce::jlimit(0.f, .85f, kBase + kMod * kModSrc[blockStart]);
+
+		auto cutoff = 20.f * std::powf(20000.f / 20.f, normalizedCutoff);
+		auto g = juce::dsp::FastMathApproximations::tan<float>(juce::MathConstants<float>::pi * cutoff / data->sampleRate);
+		auto G = g / (g + 1);
+
+		for (int channel = 0; channel < outputBlock.getNumChannels(); channel++) {
+
+			auto outputChannel = outputBlock.getChannelPointer(channel);
+			for (int i = blockStart; i < end; i++) {
+				auto input = outputChannel[i] + feedback * last[channel];
+				auto v = G * (input - filterS1[channel]);
+				auto y = v + filterS1[channel];
+				filterS1[channel] = y + v;
+
+				//lowpass = y, highpass = input - y
+				// interpolate between low and highpass to get the signal that should be distorted
+				auto variableSignal = y + filterPos * (input - 2 * y);
+				auto fixedSignal = input - variableSignal;
+
+				input = juce::dsp::FastMathApproximations::tanh(k * variableSignal) + fixedSignal;
+				last[channel] = input;
+				outputChannel[i] += dryWet * (input - outputChannel[i]);
+
+			}
+		}
+	}
+	minMax = outputBlock.findMinAndMax();
+	auto newMagnitude = juce::jmax(std::abs(minMax.getStart()), std::abs(minMax.getEnd()));
+	jassert(newMagnitude != 0.f);
+	outputBlock.multiplyBy(originalMagnitude / newMagnitude);
 
 	return true; // TODO
 }

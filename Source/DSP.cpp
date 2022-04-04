@@ -84,7 +84,8 @@ namespace customDsp {
 		if (data->bypassed || context.isBypassed) {
 			return false;
 		}
-		if (!data->modParams[SharedData::ENV].isActive() && !isNoteOn) {
+
+		if (!data->modParams[SharedData::ENV].isActive() && !isNoteOn && !shouldStopCleanly) {
 			return false;
 		}
 		auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
@@ -146,10 +147,33 @@ namespace customDsp {
 			auto multiplier = data->modParams[SharedData::ENV].isActive() ?
 				inputBlock.getSample((size_t)data->modParams[SharedData::ENV].src_channel, start)
 				: 1.f;
-			multiplier *= 0.125f * velocity;
+			multiplier *= 0.25f * velocity;
 			workBuffers.getSingleChannelBlock(0).getSubBlock(start, end - start).multiplyBy(multiplier);
 		}
+		// prevent clicking when stopping without an envelope
+		if (shouldStopCleanly) {
+			shouldStopCleanly = false;
+			auto numSamples = workBuffers.getNumSamples();
+			auto* channelPtr = workBuffers.getChannelPointer(0);
+			for (int i = numSamples - 1; i >= 0; i--) {
+				channelPtr[i] *= (numSamples - i) / static_cast<float>(numSamples);
+			}
 
+			//auto minMag = 2.f;
+			//auto minMagPos = -1;
+			//auto* channelPtr = workBuffers.getChannelPointer(0);
+			//for (int i = workBuffers.getNumSamples()-1; i >= 0; i--) {
+			//	auto mag = std::fabs(channelPtr[i]);
+			//	if (mag < minMag) {
+			//		minMag = mag;
+			//		minMagPos = i;
+			//		if (minMag < 0.0001f) { // TODO Threshold
+			//			break;
+			//		}
+			//	}
+			//}
+			//workBuffers.getSingleChannelBlock(0).getSubBlock(minMagPos).fill(0.f);
+		}
 		for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
 			outputBlock.getSingleChannelBlock(channel).add(workBuffers.getSingleChannelBlock(0));
 		}
@@ -202,13 +226,24 @@ namespace customDsp {
 		auto& inputBlock = context.getInputBlock(); // holds envelopes and lfos for modulation
 		auto& outputBlock = context.getOutputBlock();
 
-		auto workChannel = workBuffers.getSingleChannelBlock(0);
-		workChannel.replaceWithProductOf(
-			inputBlock.getSingleChannelBlock((int)data->modParams[SharedData::GAIN].src_channel), data->modParams[SharedData::GAIN].factor);
-		workChannel.add(data->gain);
+		auto baseGain = data->gain;
+		auto gainMod = data->modParams[SharedData::GAIN].factor;
+		auto gainModSrc = inputBlock.getChannelPointer((size_t)data->modParams[SharedData::GAIN].src_channel);
+
+		auto workPtr = workBuffers.getChannelPointer(0);
+		for (int start = 0; start < workBuffers.getNumSamples(); start += configuration::MOD_BLOCK_SIZE) {
+			auto end = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples());
+
+			gainSmoothed.reset(end - start);
+			gainSmoothed.setTargetValue(baseGain + gainMod * gainModSrc[end]);
+
+			for (int i = start; i < end; i++) {
+				workPtr[i] = gainSmoothed.getNextValue();
+			}
+		}
 
 		for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
-			outputBlock.getSingleChannelBlock(channel).multiplyBy(workChannel);
+			outputBlock.getSingleChannelBlock(channel).multiplyBy(workBuffers.getSingleChannelBlock(0));
 		}
 
 		return isNoteOn;
@@ -239,8 +274,8 @@ namespace customDsp {
 
 			auto currentPan = juce::jlimit(-1.f, 1.f, basePan + panMod * panModSrc[start]);
 
-			left.getSubBlock(start, end - start).multiplyBy(1.f-currentPan);
-			right.getSubBlock(start, end - start).multiplyBy(1.f+currentPan);
+			left.getSubBlock(start, end - start).multiplyBy(1.f - currentPan);
+			right.getSubBlock(start, end - start).multiplyBy(1.f + currentPan);
 		}
 
 		return false;

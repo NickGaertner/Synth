@@ -14,6 +14,7 @@ namespace customDsp {
 		PHASER,
 		DELAY,
 		TUBE,
+		DISTORTION,
 		NUMBER_OF_TYPES,
 	};
 
@@ -25,6 +26,7 @@ namespace customDsp {
 		"Phaser",
 		"Delay",
 		"Tube",
+		"Distortion",
 	};
 
 	inline static const juce::StringArray PARAMETER_0_NAMES{
@@ -34,7 +36,8 @@ namespace customDsp {
 		"Rate",
 		"Rate",
 		"Damp",
-		"Tube",
+		"kPos",
+		"Freq Split",
 	};
 
 	inline static const juce::StringArray PARAMETER_1_NAMES{
@@ -44,7 +47,8 @@ namespace customDsp {
 		"Depth",
 		"Depth",
 		"Time Left",
-		"Tube",
+		"kNeg",
+		"Freq Emphasis",
 	};
 
 	inline static const juce::StringArray PARAMETER_2_NAMES{
@@ -54,7 +58,8 @@ namespace customDsp {
 		"Centre Delay",
 		"Feedback",
 		"Time Right",
-		"Tube",
+		"Stages",
+		"Distortion",
 	};
 
 	class FX;
@@ -377,29 +382,44 @@ namespace customDsp {
 		static constexpr int stages = 6;
 		float minCutoffs[stages]{ 16.f,33.f,48.f,98.f,160.f,260.f, };
 		float maxCutoffs[stages]{ 1600.f,3300.f,4800.f,9800.f,16000.f,22000.f, };
-		
+
 		float last[2]{ 0,0 };
 		LFO::SharedData lfoData{ "ERROR" };
 		LFO lfos[2]{ &lfoData,&lfoData };
 		float allpassS1[2][stages]{ 0 };
 
-		// FirstOrderTPTFilter from JUCE/Vadim Zavalishin
-		class AllpassFilter {
-		public:
-			float processSample(float input, float cutoff, float sampleRate) {
-				auto g = juce::dsp::FastMathApproximations::tan<float>(juce::MathConstants<float>::pi * cutoff / sampleRate);
-				auto G = g / (1 + g);
-				auto v = G * (input - s1);
-				auto y = v + s1;
-				s1 = y + v;
-				return 2 * y - input;
-			}
-
-		private:
-			float s1 = 0;
-
-		};
 	};
 
+	class Tube : public FX {
+		using FX::FX;
+	public:
+		virtual void reset() override;
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+		virtual void prepareUpdate();
+	private:
+		inline static float fastArctan(float x) {
+			if (1.f < x) {
+				return juce::MathConstants<float>::halfPi - (x / (x * x + 0.28));
+			}
+			else if (x < -1.f) {
+				return -juce::MathConstants<float>::halfPi - (x / (x * x + 0.28));
+			}
+			else {
+				return x / (1 + 0.28 * x * x);
+			}
+		}
+		static constexpr int maxK = 10;
+		static constexpr int maxStages = 5;
+	};
 
+	class Distortion : public FX {
+		using FX::FX;
+	public:
+		virtual void reset() override;
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
+		virtual void prepareUpdate();
+	private:
+		float filterS1[2]{ 0 };
+		float last[2]{ 0,0 };
+	};
 }
