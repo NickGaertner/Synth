@@ -10,7 +10,7 @@
 
 #include <JuceHeader.h>
 #include "PluginProcessor.h"
-#include "GUI.h"
+#include "SpecificGUI.h"
 
 //==============================================================================
 /**
@@ -30,7 +30,7 @@ private:
 
     SynthAudioProcessor& audioProcessor;
 
-    customGui::SynthComponent synthComponent;
+    customGui::MainComponent mainComponent;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (SynthAudioProcessorEditor)
 };

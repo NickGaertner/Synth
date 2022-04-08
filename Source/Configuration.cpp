@@ -6,8 +6,8 @@ namespace configuration {
 	const int OSC_NUMBER = 3; // 3
 	const int FILTER_NUMBER = 2; // 2
 	const int FX_NUMBER = 2; // 2
-	const int ENV_NUMBER = 4; // 4
-	const int LFO_NUMBER = 4; // 4
+	const int ENV_NUMBER = 3; // 4
+	const int LFO_NUMBER = 3; // 4
 
 	const int MOD_BLOCK_SIZE = 128;
 
@@ -28,13 +28,13 @@ namespace configuration {
 		return array;
 	}
 
-	const juce::String OSC_PREFIX{ "OSC_" };
-	const juce::String FILTER_PREFIX{ "FILTER_" };
-	const juce::String FX_PREFIX{ "FX_" };
-	const juce::String ENV_PREFIX{ "ENV_" };
-	const juce::String LFO_PREFIX{ "LFO_" };
-	const juce::String PAN_PREFIX{"PAN"};
-	const juce::String MASTER_PREFIX{"MASTER"};
+	const juce::String OSC_PREFIX{ "Osc_" };
+	const juce::String FILTER_PREFIX{ "Filter_" };
+	const juce::String FX_PREFIX{ "Fx_" };
+	const juce::String ENV_PREFIX{ "Env_" };
+	const juce::String LFO_PREFIX{ "Lfo_" };
+	const juce::String PAN_PREFIX{"Pan"};
+	const juce::String MASTER_PREFIX{"Master"};
 
 	const juce::String BYPASSED_SUFFIX{"::BYPASSED"};
 	const juce::String MOD_CHANNEL_SUFFIX{ "::MOD_CHANNEL" };

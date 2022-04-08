@@ -10,11 +10,11 @@
 
 //==============================================================================
 SynthAudioProcessorEditor::SynthAudioProcessorEditor(SynthAudioProcessor& p)
-	: AudioProcessorEditor(&p), audioProcessor(p), synthComponent(audioProcessor)
+	: AudioProcessorEditor(&p), audioProcessor(p), mainComponent(audioProcessor)
 {
 	setLookAndFeel(&lookAndFeel);
 
-	addAndMakeVisible(synthComponent);
+	addAndMakeVisible(mainComponent);
 	setResizeLimits(950, 650, 1920, 1080);
 	//setSize(950, 650);
 	setResizable(true, false);
@@ -28,11 +28,10 @@ SynthAudioProcessorEditor::~SynthAudioProcessorEditor()
 //==============================================================================
 void SynthAudioProcessorEditor::paint(juce::Graphics& g)
 {
-
 	g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
 }
 
 void SynthAudioProcessorEditor::resized()
 {
-	synthComponent.centreWithSize(getWidth(), getHeight());
+	mainComponent.centreWithSize(getWidth(), getHeight());
 }

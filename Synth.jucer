@@ -14,8 +14,8 @@
       <FILE id="fo48Hp" name="Filter.h" compile="0" resource="0" file="Source/Filter.h"/>
       <FILE id="G3yRay" name="FX.cpp" compile="1" resource="0" file="Source/FX.cpp"/>
       <FILE id="ZhbeTx" name="FX.h" compile="0" resource="0" file="Source/FX.h"/>
-      <FILE id="vvaxEe" name="GUI.cpp" compile="1" resource="0" file="Source/GUI.cpp"/>
-      <FILE id="HNAP7f" name="GUI.h" compile="0" resource="0" file="Source/GUI.h"/>
+      <FILE id="ZLpZ1d" name="GeneralGUI.cpp" compile="1" resource="0" file="Source/GeneralGUI.cpp"/>
+      <FILE id="gyQ5Na" name="GeneralGUI.h" compile="0" resource="0" file="Source/GeneralGUI.h"/>
       <FILE id="JXe6k3" name="Modulation.cpp" compile="1" resource="0" file="Source/Modulation.cpp"/>
       <FILE id="I2kNH1" name="Modulation.h" compile="0" resource="0" file="Source/Modulation.h"/>
       <FILE id="raFqtF" name="PluginEditor.cpp" compile="1" resource="0"
@@ -25,6 +25,8 @@
             file="Source/PluginProcessor.cpp"/>
       <FILE id="sFPlE9" name="PluginProcessor.h" compile="0" resource="0"
             file="Source/PluginProcessor.h"/>
+      <FILE id="JD7ai9" name="SpecificGUI.cpp" compile="1" resource="0" file="Source/SpecificGUI.cpp"/>
+      <FILE id="wxqAsF" name="SpecificGUI.h" compile="0" resource="0" file="Source/SpecificGUI.h"/>
       <FILE id="Qbw9RE" name="Synth.cpp" compile="1" resource="0" file="Source/Synth.cpp"/>
       <FILE id="IaDZMm" name="Synth.h" compile="0" resource="0" file="Source/Synth.h"/>
       <FILE id="TtZGwx" name="Wavetable.cpp" compile="1" resource="0" file="Source/Wavetable.cpp"/>
