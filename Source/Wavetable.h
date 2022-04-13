@@ -6,13 +6,12 @@
 
 namespace wavetable {
 
-
 	// Wavetables as data:
 	// 4 Byte (int) for number of channels per table
 	// 4 Byte (int) for wtResolution
 	// then just the 11 wavetables one after another starting with low frequency tables 
 	// and ending with the highest, going from first to last channel
-	// empty channels and values at the end, which we use at runtime, won't be safed to disk and will be appended, when reading from disk
+	// empty channels and redundant values at the end, which we use at runtime, won't be safed to disk and will be appended, when reading from disk
 
 	class Wavetable : public juce::ReferenceCountedObject {
 	public:
@@ -29,9 +28,7 @@ namespace wavetable {
 		const juce::String& getName();
 
 	protected:
-		Wavetable(const juce::String& t_name) : name(t_name) {
-		}
-		juce::String name;
+		Wavetable(const juce::String& t_name) : name(t_name) {}
 
 		static int getMaxHarmonics(double sampleRate);
 		void createFromHarmonicWeights(double sampleRate, const juce::Array<double>& weights);
@@ -40,8 +37,7 @@ namespace wavetable {
 		static void updateSineValues(double sampleRate);
 		inline static juce::AudioBuffer<double> sineValues;
 
-		// number of samples for one cycle
-		static const int defaultWtResolution = 2048 - 1;
+		juce::String name;
 
 		// tables[i] holds the wavetable for frequencies f with 2^(i+4) < f <= 2^(i+5)
 		// (for lower frequencies we have more and higher harmonics)
@@ -50,8 +46,12 @@ namespace wavetable {
 		// each wavetable can have a different number of channels, but the last one will not be used; again to simplify calculations
 		// I will go with 63+1 channels
 		juce::AudioBuffer<float> tables[11];
+		static const int DEFAULT_NUM_CHANNELS = 63;
+		// number of samples for one cycle
+		static const int DEFAULT_WT_RESOLUTION = 2048 - 1;
 
 	private:
+
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Wavetable)
 	};
 
@@ -79,13 +79,7 @@ namespace wavetable {
 
 	private:
 
-		void deleteUnused() {
-			for (auto wtPtr : wavetables) {
-				if (wtPtr->getReferenceCount() == 1) {
-					wavetables.removeObject(wtPtr);
-				}
-			}
-		};
+		void deleteUnused();
 
 		std::unique_ptr<juce::File> wtFolder;
 		juce::StringArray wavetableNames;
@@ -112,8 +106,6 @@ namespace wavetable {
 
 		JUCE_DECLARE_NON_COPYABLE(WavetableCache)
 	};
-
-	// TODO maybe make these static function
 
 	class SawHarmonicsWavetable : public Wavetable {
 	public:

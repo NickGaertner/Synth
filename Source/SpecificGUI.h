@@ -172,8 +172,6 @@ namespace customGui {
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(PanModule)
 	};
 
-	// TODO master here
-
 	class SpectrumAnalyzerModule : public SynthModule {
 	public:
 		SpectrumAnalyzerModule() = delete;

@@ -56,75 +56,15 @@ namespace customDsp {
 
 			int numChannels = -1;
 
-			virtual FilterChooser* createProcessor() override {
-				return new FilterChooser(this);
-			}
+			virtual FilterChooser* createProcessor() override;
 
-			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
+			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override;
 
-				layout.add(std::make_unique<juce::AudioParameterBool>(
-					prefix + configuration::BYPASSED_SUFFIX,
-					prefix + configuration::BYPASSED_SUFFIX,
-					bypassed));
+			virtual void registerAsListener(juce::AudioProcessorValueTreeState& apvts) override;
 
-				layout.add(std::make_unique<juce::AudioParameterChoice>(
-					prefix + configuration::FILTER_TYPE_SUFFIX,
-					prefix + configuration::FILTER_TYPE_SUFFIX,
-					FILTER_TYPE_NAMES,
-					(int)filterType));
-
-				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + configuration::CUTOFF_SUFFIX,
-					prefix + configuration::CUTOFF_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 1.0f, 0.00001f, 0.3f),
-					cutoff));
-				modParams[CUTOFF].addModParams(layout, prefix + configuration::CUTOFF_SUFFIX);
-
-				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + configuration::RESONANCE_SUFFIX,
-					prefix + configuration::RESONANCE_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 1.0f, 0.0001f, 1.f),
-					resonance));
-				modParams[RES].addModParams(layout, prefix + configuration::RESONANCE_SUFFIX);
-
-				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + configuration::SPECIAL_SUFFIX,
-					prefix + configuration::SPECIAL_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f, 1.f),
-					special));
-				modParams[SPECIAL].addModParams(layout, prefix + configuration::SPECIAL_SUFFIX);
-			}
-
-			virtual void registerAsListener(juce::AudioProcessorValueTreeState& apvts) override {
-				apvts.addParameterListener(prefix + configuration::BYPASSED_SUFFIX, this);
-				apvts.addParameterListener(prefix + configuration::FILTER_TYPE_SUFFIX, this);
-				apvts.addParameterListener(prefix + configuration::CUTOFF_SUFFIX, this);
-				modParams[CUTOFF].registerAsListener(apvts, prefix + configuration::CUTOFF_SUFFIX);
-				apvts.addParameterListener(prefix + configuration::RESONANCE_SUFFIX, this);
-				modParams[RES].registerAsListener(apvts, prefix + configuration::RESONANCE_SUFFIX);
-				apvts.addParameterListener(prefix + configuration::DRIVE_SUFFIX, this);
-				modParams[SPECIAL].registerAsListener(apvts, prefix + configuration::SPECIAL_SUFFIX);
-
-			}
-
-			virtual void parameterChanged(const juce::String& parameterID, float newValue) override {
-				if (parameterID.endsWith(prefix + configuration::BYPASSED_SUFFIX)) {
-					bypassed = (bool)newValue;
-				}
-				else if (parameterID.endsWith(prefix + configuration::FILTER_TYPE_SUFFIX)) {
-					filterType = static_cast<FilterType>(newValue);
-				}
-				else if (parameterID.endsWith(prefix + configuration::CUTOFF_SUFFIX)) {
-					cutoff = newValue;
-				}
-				else if (parameterID.endsWith(prefix + configuration::RESONANCE_SUFFIX)) {
-					resonance = newValue;
-				}
-				else if (parameterID.endsWith(prefix + configuration::SPECIAL_SUFFIX)) {
-					special = newValue;
-				}
-			}
+			virtual void parameterChanged(const juce::String& parameterID, float newValue) override;
 		private:
+
 			JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SharedData)
 		};
 
@@ -140,7 +80,7 @@ namespace customDsp {
 		virtual void reset() override;
 
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
-		
+
 		virtual void noteOn() override;
 
 		virtual void noteOff() override;
@@ -156,7 +96,7 @@ namespace customDsp {
 	public:
 		Filter() = delete;
 		Filter(FilterChooser::SharedData* t_data) : data(t_data) {}
-		virtual ~Filter() override{}
+		virtual ~Filter() override {}
 
 		virtual void updateMode() = 0;
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
@@ -179,9 +119,10 @@ namespace customDsp {
 		virtual ~DummyFilter() override {};
 
 		virtual void reset() override {}
-		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override { 
+		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
 			juce::ignoreUnused(context, workBuffers);
-			return false; }
+			return false;
+		}
 		virtual void prepareUpdate() {}
 	private:
 		void updateMode() override {}
@@ -201,13 +142,8 @@ namespace customDsp {
 	private:
 		void updateMode() override;
 
-		void snapToZero() {
-			for (auto v : { &s1, &s2 }) {
-				for (auto& element : *v) {
-					juce::dsp::util::snapToZero(element);
-				}
-			}
-		}
 		std::vector<float>s1{ 2 }, s2{ 2 };
+
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TPTFilter)
 	};
-} 
+}

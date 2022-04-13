@@ -3,6 +3,7 @@
 
 #include <JuceHeader.h>
 #include "DSP.h"
+#include "Modulation.h"
 
 namespace customDsp {
 
@@ -13,7 +14,6 @@ namespace customDsp {
 		CHORUS,
 		PHASER,
 		DELAY,
-		TUBE,
 		DISTORTION,
 		NUMBER_OF_TYPES,
 	};
@@ -25,7 +25,6 @@ namespace customDsp {
 		"Chorus",
 		"Phaser",
 		"Delay",
-		"Tube",
 		"Distortion",
 	};
 
@@ -36,7 +35,6 @@ namespace customDsp {
 		"Rate",
 		"Rate",
 		"Damp",
-		"kPos",
 		"Freq Split",
 	};
 
@@ -47,7 +45,6 @@ namespace customDsp {
 		"Depth",
 		"Depth",
 		"Time Left",
-		"kNeg",
 		"Freq Emphasis",
 	};
 
@@ -58,7 +55,6 @@ namespace customDsp {
 		"Centre Delay",
 		"Feedback",
 		"Time Right",
-		"Stages",
 		"Distortion",
 	};
 
@@ -89,87 +85,16 @@ namespace customDsp {
 
 			int numChannels = -1;
 
-			virtual FXChooser* createProcessor() override {
-				return new FXChooser(this);
-			}
+			virtual FXChooser* createProcessor() override;
 
-			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override {
+			virtual void addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) override;
 
-				layout.add(std::make_unique<juce::AudioParameterBool>(
-					prefix + configuration::BYPASSED_SUFFIX,
-					prefix + configuration::BYPASSED_SUFFIX,
-					bypassed));
+			virtual void registerAsListener(juce::AudioProcessorValueTreeState& apvts) override;
 
-				layout.add(std::make_unique<juce::AudioParameterChoice>(
-					prefix + configuration::FX_TYPE_SUFFIX,
-					prefix + configuration::FX_TYPE_SUFFIX,
-					FX_TYPE_NAMES,
-					(int)fxType));
-
-				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + configuration::DRY_WET_SUFFIX,
-					prefix + configuration::DRY_WET_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 1.0f, 0.0001f, 1.f),
-					dryWet));
-				modParams[DRY_WET].addModParams(layout, prefix + configuration::DRY_WET_SUFFIX);
-
-				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + configuration::PARAMETER_0_SUFFIX,
-					prefix + configuration::PARAMETER_0_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 1.0f, 0.0001f, 1.f),
-					parameter0));
-				modParams[PARAMETER_0].addModParams(layout, prefix + configuration::PARAMETER_0_SUFFIX);
-
-				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + configuration::PARAMETER_1_SUFFIX,
-					prefix + configuration::PARAMETER_1_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 1.0f, 0.0001f, 1.f),
-					parameter1));
-				modParams[PARAMETER_1].addModParams(layout, prefix + configuration::PARAMETER_1_SUFFIX);
-
-				layout.add(std::make_unique<juce::AudioParameterFloat>(
-					prefix + configuration::PARAMETER_2_SUFFIX,
-					prefix + configuration::PARAMETER_2_SUFFIX,
-					juce::NormalisableRange<float>(0.0f, 1.0f, 0.0001f, 1.f),
-					parameter2));
-				modParams[PARAMETER_2].addModParams(layout, prefix + configuration::PARAMETER_2_SUFFIX);
-			}
-
-			virtual void registerAsListener(juce::AudioProcessorValueTreeState& apvts) override {
-				apvts.addParameterListener(prefix + configuration::BYPASSED_SUFFIX, this);
-				apvts.addParameterListener(prefix + configuration::FX_TYPE_SUFFIX, this);
-				apvts.addParameterListener(prefix + configuration::DRY_WET_SUFFIX, this);
-				modParams[DRY_WET].registerAsListener(apvts, prefix + configuration::DRY_WET_SUFFIX);
-				apvts.addParameterListener(prefix + configuration::PARAMETER_0_SUFFIX, this);
-				modParams[PARAMETER_0].registerAsListener(apvts, prefix + configuration::PARAMETER_0_SUFFIX);
-				apvts.addParameterListener(prefix + configuration::PARAMETER_1_SUFFIX, this);
-				modParams[PARAMETER_1].registerAsListener(apvts, prefix + configuration::PARAMETER_1_SUFFIX);
-				apvts.addParameterListener(prefix + configuration::PARAMETER_2_SUFFIX, this);
-				modParams[PARAMETER_2].registerAsListener(apvts, prefix + configuration::PARAMETER_2_SUFFIX);
-			}
-
-			virtual void parameterChanged(const juce::String& parameterID, float newValue) override {
-				if (parameterID.endsWith(prefix + configuration::BYPASSED_SUFFIX)) {
-					bypassed = static_cast<bool>(newValue);
-				}
-				else if (parameterID.endsWith(prefix + configuration::FX_TYPE_SUFFIX)) {
-					fxType = static_cast<FXType>(newValue);
-				}
-				else if (parameterID.endsWith(prefix + configuration::DRY_WET_SUFFIX)) {
-					dryWet = newValue;
-				}
-				else if (parameterID.endsWith(prefix + configuration::PARAMETER_0_SUFFIX)) {
-					parameter0 = newValue;
-				}
-				else if (parameterID.endsWith(prefix + configuration::PARAMETER_1_SUFFIX)) {
-					parameter1 = newValue;
-				}
-				else if (parameterID.endsWith(prefix + configuration::PARAMETER_2_SUFFIX)) {
-					parameter2 = newValue;
-				}
-			}
+			virtual void parameterChanged(const juce::String& parameterID, float newValue) override;
 
 		private:
+
 			JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SharedData)
 		};
 
@@ -213,6 +138,7 @@ namespace customDsp {
 		FXChooser::SharedData* data;
 
 	private:
+
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(FX)
 	};
 
@@ -290,36 +216,14 @@ namespace customDsp {
 
 	class DelayLine {
 	public:
-		void setMaxDelay(int maxDelay) {
-			buffer.allocate(maxDelay, true);
-			bufferSize = maxDelay;
-			index = 0;
-		}
-		void reset() {
-			buffer.clear(bufferSize);
-		}
-		float process(float sample, float delay, float feedback) {
-			jassert(1.f <= delay && delay <= bufferSize);
-			jassert(-1.f < feedback && feedback < 1.f);
-			auto output = buffer[index];
-			buffer[index] = 0;
-			auto input = /*(1.f - std::abs(feedback)) **/ sample + feedback * output;
-			int delayOffset = static_cast<int>(delay);
-			float delayFrac = delay - delayOffset;
-			jassert(0.f <= delayFrac && delayFrac < 1.f);
-			buffer[(index + delayOffset) % bufferSize] += (1.f - delayFrac) * input;
-			buffer[(index + delayOffset + 1) % bufferSize] += delayFrac * input;
-			index = (index + 1) % bufferSize;
-			return output;
-		}
-		bool isEmpty() {
-			for (int i = 0; i < bufferSize; i++) {
-				if (buffer[i] != 0.f) {
-					return false;
-				}
-			}
-			return true;
-		}
+		void setMaxDelay(int maxDelay);
+		
+		void reset();
+		
+		float process(float sample, float delay, float feedback);
+
+		bool isEmpty();
+
 	private:
 		juce::HeapBlock<float> buffer;
 		int bufferSize = -1;
@@ -342,7 +246,7 @@ namespace customDsp {
 		};
 		juce::SmoothedValue<float> delaySmoothed[2];
 		DelayLine delays[2]{};
-		static constexpr float maxDelaySec = 1.f;
+		static constexpr float MAX_DELAY_SEC = 1.f;
 	};
 
 	class Flanger : public FX {
@@ -365,8 +269,8 @@ namespace customDsp {
 		juce::SmoothedValue<float> delaySmoothed[2];
 		juce::SmoothedValue<float> feedbackSmoothed[2];
 
-		static constexpr float minDelaySamples = 2.f;
-		static constexpr float maxDelayMSec = 20.f;
+		static constexpr float MIN_DELAY_SAMPLES = 2.f;
+		static constexpr float MAX_DELAY_MSEC = 20.f;
 	};
 
 	class Chorus : public FX {
@@ -389,8 +293,8 @@ namespace customDsp {
 		juce::SmoothedValue<float> delaySmoothed[2];
 		juce::SmoothedValue<float> centreDelaySmoothed[2];
 
-		static constexpr float minDelayMSec = 7.f;
-		static constexpr float maxDelayMSec = 30.f;
+		static constexpr float MIN_DELAY_MSEC = 7.f;
+		static constexpr float MAX_DELAY_MSEC = 30.f;
 	};
 
 	class Phaser : public FX {
@@ -406,39 +310,15 @@ namespace customDsp {
 			LEFT,
 			RIGHT
 		};
-		static constexpr int stages = 6;
-		float minCutoffs[stages]{ 16.f,33.f,48.f,98.f,160.f,260.f, };
-		float maxCutoffs[stages]{ 1600.f,3300.f,4800.f,9800.f,16000.f,22000.f, };
+		static constexpr int STAGES = 6;
+		float minCutoffs[STAGES]{ 16.f,33.f,48.f,98.f,160.f,260.f, };
+		float maxCutoffs[STAGES]{ 1600.f,3300.f,4800.f,9800.f,16000.f,22000.f, };
 
 		float last[2]{ 0,0 };
 		LFO::SharedData lfoData{ "ERROR" };
 		LFO lfos[2]{ &lfoData,&lfoData };
-		float allpassS1[2][stages]{ 0 };
+		float allpassS1[2][STAGES]{ 0 };
 
-	};
-
-	class Tube : public FX {
-		using FX::FX;
-	public:
-		virtual ~Tube() override {};
-
-		virtual void reset() override;
-		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
-		virtual void prepareUpdate();
-	private:
-		inline static float fastArctan(float x) {
-			if (1.f < x) {
-				return juce::MathConstants<float>::halfPi - (x / (x * x + 0.28));
-			}
-			else if (x < -1.f) {
-				return -juce::MathConstants<float>::halfPi - (x / (x * x + 0.28));
-			}
-			else {
-				return x / (1 + 0.28 * x * x);
-			}
-		}
-		static constexpr int maxK = 10;
-		static constexpr int maxStages = 5;
 	};
 
 	class Distortion : public FX {

@@ -3,80 +3,177 @@
 
 namespace customDsp {
 
-	void Envelope::reset() {
-		stage = Stage::IDLE;
-		level = 0.f;
-		summand = 0.f;
-		samplesUntilTransition = (size_t)-1;
+	bool ModulationParam::isActive() {
+		return src_channel != configuration::EMPTY_MOD_CHANNEL;
 	}
 
-	bool Envelope::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) {
-		juce::ignoreUnused(workBuffers);
-		if (stage == Stage::IDLE || context.isBypassed) {
-			return false;
-		}
-		auto& outputBlock = context.getOutputBlock();
-		auto currentPos = 0;
-		auto samplesRemaining = outputBlock.getNumSamples();
-
-		while (samplesRemaining) {
-			if (samplesUntilTransition == 0) {
-				transition();
-			}
-			auto samplesThisStep = samplesUntilTransition > 0 ? // "Do I need to transition at some point (>0)?"
-				juce::jmin((int)juce::jmin(samplesUntilTransition, samplesRemaining), configuration::MOD_BLOCK_SIZE)
-				: juce::jmin((int)samplesRemaining, configuration::MOD_BLOCK_SIZE);
-
-			outputBlock.getSubBlock(currentPos, samplesThisStep).add(level);
-			level += summand * samplesThisStep;
-			currentPos += samplesThisStep;
-			samplesUntilTransition -= samplesThisStep;
-			samplesRemaining -= samplesThisStep;
-		}
-
-		return true;
-	};
-
-	void Envelope::noteOn() {
-		Processor::noteOn();
-		reset();
-		transition();
+	bool ModulationParam::isLfo() {
+		return isActive() && src_channel >= configuration::ENV_NUMBER;
 	}
-	void Envelope::noteOff() {
-		Processor::noteOff();
-		if (stage != Stage::IDLE) {
-			stage = Stage::SUSTAIN;
-			transition();
-		}
-	}
-	void Envelope::transition() {
-		do {
-			advanceStage();
-		} while (stage != Stage::IDLE && data->stageValues[(int)stage] == 0.f);
 
-		if (stage == Stage::ATTACK) {
-			samplesUntilTransition = (size_t)(data->sampleRate * data->stageValues[(int)Stage::ATTACK]);
-			level = data->minLevel;
-			summand = (1.f - level) / samplesUntilTransition;
+	bool ModulationParam::isEnv() {
+		return src_channel < configuration::ENV_NUMBER;
+	}
+
+	void ModulationParam::addModParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& name,
+		float modRange, float intervalValue)
+	{
+		layout.add(std::make_unique<juce::AudioParameterFloat>(
+			name + configuration::MOD_FACTOR_SUFFIX,
+			name + configuration::MOD_FACTOR_SUFFIX,
+			juce::NormalisableRange<float>(-1.f * modRange, 1.0f * modRange, intervalValue, 1.f),
+			factor));
+		layout.add(std::make_unique<juce::AudioParameterChoice>(
+			name + configuration::MOD_CHANNEL_SUFFIX,
+			name + configuration::MOD_CHANNEL_SUFFIX,
+			configuration::getModChannelNames(),
+			src_channel));
+	}
+
+	void ModulationParam::registerAsListener(juce::AudioProcessorValueTreeState& apvts, const juce::String& name) {
+		apvts.addParameterListener(name + configuration::MOD_CHANNEL_SUFFIX, this);
+		apvts.addParameterListener(name + configuration::MOD_FACTOR_SUFFIX, this);
+	}
+
+	void ModulationParam::parameterChanged(const juce::String& parameterID, float newValue) {
+		if (parameterID.endsWith(configuration::MOD_CHANNEL_SUFFIX)) {
+			src_channel = (int)newValue;
 		}
-		else if (stage == Stage::DECAY) {
-			samplesUntilTransition = (size_t)(data->sampleRate * data->stageValues[(int)Stage::DECAY]);
-			level = 1.f;
-			summand = (data->stageValues[(int)Stage::SUSTAIN] - level) / samplesUntilTransition;
-		}
-		else if (stage == Stage::SUSTAIN) {
-			samplesUntilTransition = (size_t)-1;
-			level = data->stageValues[(int)Stage::SUSTAIN];
-			summand = 0.f;
-		}
-		else if (stage == Stage::RELEASE) {
-			samplesUntilTransition = (size_t)(data->sampleRate * data->stageValues[(int)Stage::RELEASE]);
-			summand = (data->minLevel - level) / samplesUntilTransition;
+		else if (parameterID.endsWith(configuration::MOD_FACTOR_SUFFIX)) {
+			factor = newValue;
 		}
 		else {
-			jassert(stage == Stage::IDLE);
-			reset();
+			jassertfalse;
 		}
+	}
+
+	void Processor::noteOn() {
+		isNoteOn = true;
+	}
+
+	void Processor::noteOff() {
+		isNoteOn = false;
+	}
+
+	void ProcessorChain::prepare(const juce::dsp::ProcessSpec& spec) {
+		std::for_each(processors.begin(), processors.end(), [&](Processor* p) {p->prepare(spec); });
+	};
+
+	void ProcessorChain::reset() {
+		std::for_each(processors.begin(), processors.end(), [&](Processor* p) {p->reset(); });
+	};
+
+	bool ProcessorChain::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) {
+		bool needMoreTime = false;
+		std::for_each(processors.begin(), processors.end(), [&](Processor* p) {
+			needMoreTime |= p->process(context, workBuffers);
+			});
+		return needMoreTime;
+	}
+
+	void ProcessorChain::noteOn() {
+		Processor::noteOn();
+		std::for_each(processors.begin(), processors.end(), [&](Processor* p) {p->noteOn(); });
+	}
+
+	void ProcessorChain::noteOff() {
+		Processor::noteOff();
+		std::for_each(processors.begin(), processors.end(), [&](Processor* p) {p->noteOff(); });
+	};
+
+	void ProcessorChain::addProcessor(Processor* processor) {
+		processors.add(processor);
+	}
+
+	Processor* ProcessorChain::getProcessor(int index) {
+		return processors[index];
+	}
+
+	int ProcessorChain::size() {
+		return processors.size();
+	}
+
+	bool SplitProcessor::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) {
+		jassert(processors.size() < context.getOutputBlock().getNumChannels());
+		bool needMoreTime = false;
+		for (int i = 0; i < processors.size(); i++) {
+			auto singleOutputChannel = context.getOutputBlock().getSingleChannelBlock(i);
+			juce::dsp::ProcessContextNonReplacing<float> tmp_context{ context.getInputBlock(), singleOutputChannel };
+			needMoreTime |= processors[i]->process(tmp_context, workBuffers);
+		}
+		return needMoreTime;
+	};
+
+	InterpolationOsc* InterpolationOsc::SharedData::createProcessor() {
+		return new InterpolationOsc(this);
+	};
+
+	void InterpolationOsc::SharedData::addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) {
+
+		layout.add(std::make_unique<juce::AudioParameterBool>(
+			prefix + configuration::BYPASSED_SUFFIX,
+			prefix + configuration::BYPASSED_SUFFIX,
+			bypassed));
+
+		modParams[ENV].addModParams(layout, prefix + configuration::ENV_SUFFIX);
+
+		layout.add(std::make_unique<juce::AudioParameterFloat>(
+			prefix + configuration::WT_POS_SUFFIX,
+			prefix + configuration::WT_POS_SUFFIX,
+			juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f, 1.f),
+			wtPos));
+		modParams[WT_POS].addModParams(layout, prefix + configuration::WT_POS_SUFFIX);
+
+		layout.add(std::make_unique<juce::AudioParameterFloat>(
+			prefix + configuration::PITCH_SUFFIX,
+			prefix + configuration::PITCH_SUFFIX,
+			juce::NormalisableRange<float>(-24.0f, 24.0f, 0.01f, 1.f),
+			pitch));
+		modParams[PITCH].addModParams(layout, prefix + configuration::PITCH_SUFFIX, 24.f, 0.01f);
+
+		layout.add(std::make_unique<juce::AudioParameterChoice>(
+			prefix + configuration::WT_SUFFIX,
+			prefix + configuration::WT_SUFFIX,
+			wavetable::WavetableCache::getInstance()->getWavetableNames(),
+			0));
+	}
+
+	void InterpolationOsc::SharedData::registerAsListener(juce::AudioProcessorValueTreeState& apvts) {
+		apvts.addParameterListener(prefix + configuration::BYPASSED_SUFFIX, this);
+		modParams[ENV].registerAsListener(apvts, prefix + configuration::ENV_SUFFIX);
+		apvts.addParameterListener(prefix + configuration::WT_POS_SUFFIX, this);
+		modParams[WT_POS].registerAsListener(apvts, prefix + configuration::WT_POS_SUFFIX);
+		apvts.addParameterListener(prefix + configuration::PITCH_SUFFIX, this);
+		modParams[PITCH].registerAsListener(apvts, prefix + configuration::PITCH_SUFFIX);
+		apvts.addParameterListener(prefix + configuration::WT_SUFFIX, this);
+	}
+
+	void InterpolationOsc::SharedData::parameterChanged(const juce::String& parameterID, float newValue) {
+		if (parameterID.endsWith(configuration::BYPASSED_SUFFIX)) {
+			bypassed = (bool)newValue;
+		}
+		else if (parameterID.endsWith(configuration::WT_POS_SUFFIX)) {
+			wtPos = newValue;
+		}
+		else if (parameterID.endsWith(configuration::PITCH_SUFFIX)) {
+			pitch = newValue;
+		}
+		else if (parameterID.endsWith(configuration::WT_SUFFIX)) {
+			wt = wavetable::WavetableCache::getInstance()->getWavetable(static_cast<int>(newValue));
+		}
+		else {
+			jassertfalse;
+		}
+	}
+
+	void InterpolationOsc::prepare(const juce::dsp::ProcessSpec& spec) {
+		data->sampleRate = spec.sampleRate;
+	};
+
+	void InterpolationOsc::reset() {
+		phase.reset();
+		shouldStopCleanly = false;
+		currentReleaseSamples = 0;
 	}
 
 	bool InterpolationOsc::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
@@ -147,7 +244,7 @@ namespace customDsp {
 			auto multiplier = data->modParams[SharedData::ENV].isActive() ?
 				inputBlock.getSample((size_t)data->modParams[SharedData::ENV].src_channel, start)
 				: 1.f;
-			multiplier *= 0.25f * velocity;
+			multiplier *= velocity / configuration::OSC_NUMBER;
 			workBuffers.getSingleChannelBlock(0).getSubBlock(start, end - start).multiplyBy(multiplier);
 		}
 
@@ -156,7 +253,7 @@ namespace customDsp {
 			auto numSamples = workBuffers.getNumSamples();
 			auto samplesToFade = juce::jmin(currentReleaseSamples, static_cast<int>(numSamples));
 			auto* channelPtr = workBuffers.getChannelPointer(0);
-			float maxReleaseSamples2f = maxReleaseSamples * maxReleaseSamples;
+			const float maxReleaseSamples2f = MAX_RELEASE_SAMPLES * MAX_RELEASE_SAMPLES;
 			for (int i = 0; i < samplesToFade; i++) {
 				channelPtr[i] *= currentReleaseSamples * currentReleaseSamples / maxReleaseSamples2f;
 				currentReleaseSamples--;
@@ -168,7 +265,6 @@ namespace customDsp {
 					channelPtr[i] = 0.f;
 				}
 			}
-
 		}
 
 		for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
@@ -178,40 +274,62 @@ namespace customDsp {
 		return isNoteOn || shouldStopCleanly;
 	};
 
-	bool LFO::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
+	void InterpolationOsc::setFrequency(float t_frequency, bool force) {
+		juce::ignoreUnused(force);
+		frequency = t_frequency;
+	}
+
+	void InterpolationOsc::setVelocity(float t_velocity)
 	{
-		auto& outputBlock = context.getOutputBlock();
+		velocity = t_velocity;
+	}
 
-		float phaseStep = (juce::MathConstants<float>::twoPi * data->rate) / (float)data->sampleRate;
+	int InterpolationOsc::getEnvChannel() {
+		return data->modParams[SharedData::ENV].src_channel;
+	}
 
-		auto& wt = data->wt->getTable(30.f); // just get a low freq table
-
-		auto wtPos = data->wtPos;
-		auto scaledWtPos = wtPos * (wt.getNumChannels() - 1 - 1);
-		int channelIndex = static_cast<int>(scaledWtPos);
-		auto channelDelta = scaledWtPos - channelIndex;
-
-		auto channel0 = wt.getReadPointer(channelIndex);
-		auto channel1 = wt.getReadPointer(channelIndex + 1);
-
-		for (int start = 0; start < outputBlock.getNumSamples(); start += configuration::MOD_BLOCK_SIZE) {
-			auto length = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)outputBlock.getNumSamples()) - start;
-
-			auto x = phase.advance(phaseStep * length);
-
-			auto scaledX = (x / juce::MathConstants<float>::twoPi) * (wt.getNumSamples() - 1);
-			int sampleIndex = static_cast<int>(scaledX);
-			auto xDelta = scaledX - sampleIndex;
-			auto sample0 = juce::jmap(xDelta, channel0[sampleIndex], channel0[sampleIndex + 1]);
-			auto sample1 = juce::jmap(xDelta, channel1[sampleIndex], channel1[sampleIndex + 1]);
-
-			auto sample = juce::jmap(channelDelta, sample0, sample1);
-			outputBlock.getSubBlock(start, length).add(sample);
+	void InterpolationOsc::noteOff() {
+		if (isNoteOn && !data->modParams[SharedData::ENV].isActive()) {
+			shouldStopCleanly = true;
+			currentReleaseSamples = MAX_RELEASE_SAMPLES;
 		}
-
-		return isNoteOn;
+		Processor::noteOff();
 	};
 
+	Gain* Gain::SharedData::createProcessor() {
+		return new Gain(this);
+	};
+
+	void Gain::SharedData::addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) {
+		layout.add(std::make_unique<juce::AudioParameterFloat>(
+			prefix + configuration::GAIN_SUFFIX,
+			prefix + configuration::GAIN_SUFFIX,
+			juce::NormalisableRange<float>(0.0f, 1.0f, 0.01f, 1.f),
+			gain));
+		modParams[GAIN].addModParams(layout, prefix + configuration::GAIN_SUFFIX);
+	}
+
+	void Gain::SharedData::registerAsListener(juce::AudioProcessorValueTreeState& apvts) {
+		apvts.addParameterListener(prefix + configuration::GAIN_SUFFIX, this);
+		modParams[GAIN].registerAsListener(apvts, prefix + configuration::GAIN_SUFFIX);
+	}
+
+	void Gain::SharedData::parameterChanged(const juce::String& parameterID, float newValue) {
+		if (parameterID.endsWith(configuration::GAIN_SUFFIX)) {
+			gain = newValue;
+		}
+		else {
+			jassertfalse;
+		}
+	}
+
+	void Gain::prepare(const juce::dsp::ProcessSpec& spec) {
+		data->sampleRate = spec.sampleRate;
+	};
+
+	void Gain::reset() {
+		gainSmoothed.setCurrentAndTargetValue(data->gain);
+	}
 
 	bool Gain::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
 	{
@@ -232,7 +350,7 @@ namespace customDsp {
 			auto end = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples());
 
 			gainSmoothed.reset(end - start);
-			gainSmoothed.setTargetValue(juce::jlimit(0.f,1.f,baseGain + gainMod * gainModSrc[end]));
+			gainSmoothed.setTargetValue(juce::jlimit(0.f, 1.f, baseGain + gainMod * gainModSrc[end]));
 
 			for (int i = start; i < end; i++) {
 				workPtr[i] = gainSmoothed.getNextValue();
@@ -244,6 +362,37 @@ namespace customDsp {
 		}
 
 		return isNoteOn;
+	};
+
+	Pan* Pan::SharedData::createProcessor() {
+		return new Pan(this);
+	};
+
+	void Pan::SharedData::addParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout) {
+		layout.add(std::make_unique<juce::AudioParameterFloat>(
+			prefix + configuration::PAN_SUFFIX,
+			prefix + configuration::PAN_SUFFIX,
+			juce::NormalisableRange<float>(-1.0f, 1.0f, 0.001f, 1.f),
+			pan));
+		modParams[PAN].addModParams(layout, prefix + configuration::PAN_SUFFIX);
+	}
+
+	void Pan::SharedData::registerAsListener(juce::AudioProcessorValueTreeState& apvts) {
+		apvts.addParameterListener(prefix + configuration::PAN_SUFFIX, this);
+		modParams[PAN].registerAsListener(apvts, prefix + configuration::PAN_SUFFIX);
+	}
+
+	void Pan::SharedData::parameterChanged(const juce::String& parameterID, float newValue) {
+		if (parameterID.endsWith(configuration::PAN_SUFFIX)) {
+			pan = newValue;
+		}
+		else {
+			jassertfalse;
+		}
+	}
+
+	void Pan::prepare(const juce::dsp::ProcessSpec& spec) {
+		data->sampleRate = spec.sampleRate;
 	};
 
 	bool Pan::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
@@ -277,5 +426,4 @@ namespace customDsp {
 
 		return false;
 	};
-
 }

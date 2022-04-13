@@ -155,39 +155,39 @@ customGui::OscModule::OscModule(SynthAudioProcessor& audioProcessor, int id) :
 	sliderAttachments.add(new SliderAttachment(apvts,
 		prefix + configuration::WT_POS_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
 		wtPosModKnob.knob));
+	wtPosModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
 		prefix + configuration::WT_POS_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		wtPosModSrcChooser));
-	wtPosModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::PITCH_SUFFIX, pitchKnob.knob));
 	sliderAttachments.add(new SliderAttachment(apvts,
 		prefix + configuration::PITCH_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
 		pitchModKnob.knob));
+	pitchModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
 		prefix + configuration::PITCH_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		pitchModSrcChooser));
-	pitchModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::GAIN_SUFFIX, gainKnob.knob));
 	sliderAttachments.add(new SliderAttachment(apvts,
 		prefix + configuration::GAIN_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
 		gainModKnob.knob));
+	gainModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
 		prefix + configuration::GAIN_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		gainModSrcChooser));
-	gainModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 
+	envChooser.addItemList(configuration::getModChannelNames(), 1);
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
 		prefix + configuration::ENV_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		envChooser));
-	envChooser.addItemList(configuration::getModChannelNames(), 1);
 }
 
 void customGui::OscModule::resized()
 {
 	SynthModule::resized();
-	auto proportion = NamedKnob::knobFlex / (NamedKnob::labelFlex + NamedKnob::knobFlex);
+	auto proportion = NamedKnob::KNOB_FLEX / (NamedKnob::LABEL_FLEX + NamedKnob::KNOB_FLEX);
 	envLabel.setBounds(envLabel.getBounds().withTrimmedTop(envLabel.proportionOfHeight(proportion)));
 }
 
@@ -237,28 +237,28 @@ customGui::FilterModule::FilterModule(SynthAudioProcessor& audioProcessor, int i
 	sliderAttachments.add(new SliderAttachment(apvts,
 		prefix + configuration::CUTOFF_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
 		cutoffModKnob.knob));
+	cutoffModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
 		prefix + configuration::CUTOFF_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		cutoffModSrcChooser));
-	cutoffModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::RESONANCE_SUFFIX, resonanceKnob.knob));
 	sliderAttachments.add(new SliderAttachment(apvts,
 		prefix + configuration::RESONANCE_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
 		resonanceModKnob.knob));
+	resonanceModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
 		prefix + configuration::RESONANCE_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		resonanceModSrcChooser));
-	resonanceModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::SPECIAL_SUFFIX, specialKnob.knob));
 	sliderAttachments.add(new SliderAttachment(apvts,
 		prefix + configuration::SPECIAL_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
 		specialModKnob.knob));
+	specialModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
 		prefix + configuration::SPECIAL_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		specialModSrcChooser));
-	specialModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 }
 
 customGui::FXModule::FXModule(SynthAudioProcessor& audioProcessor, int id) :
@@ -321,37 +321,37 @@ customGui::FXModule::FXModule(SynthAudioProcessor& audioProcessor, int id) :
 	sliderAttachments.add(new SliderAttachment(apvts,
 		prefix + configuration::DRY_WET_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
 		dryWetModKnob.knob));
+	dryWetModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
 		prefix + configuration::DRY_WET_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		dryWetModSrcChooser));
-	dryWetModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::PARAMETER_0_SUFFIX, parameter0Knob.knob));
 	sliderAttachments.add(new SliderAttachment(apvts,
 		prefix + configuration::PARAMETER_0_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
 		parameter0ModKnob.knob));
+	parameter0ModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
 		prefix + configuration::PARAMETER_0_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		parameter0ModSrcChooser));
-	parameter0ModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::PARAMETER_1_SUFFIX, parameter1Knob.knob));
 	sliderAttachments.add(new SliderAttachment(apvts,
 		prefix + configuration::PARAMETER_1_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
 		parameter1ModKnob.knob));
+	parameter1ModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
 		prefix + configuration::PARAMETER_1_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		parameter1ModSrcChooser));
-	parameter1ModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::PARAMETER_2_SUFFIX, parameter2Knob.knob));
 	sliderAttachments.add(new SliderAttachment(apvts,
 		prefix + configuration::PARAMETER_2_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
 		parameter2ModKnob.knob));
+	parameter2ModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
 		prefix + configuration::PARAMETER_2_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		parameter2ModSrcChooser));
-	parameter2ModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 
 }
 
@@ -407,7 +407,6 @@ customGui::LFOModule::LFOModule(SynthAudioProcessor& audioProcessor, int id)
 
 	// adjust original layout
 	auto& grid = gridComponent.grid;
-	//grid.templateRows = {};
 
 	grid.items.addArray({
 		juce::GridItem(wtPosKnob).withArea(Property("knobRow0-start"), Property(1)),
@@ -458,10 +457,10 @@ customGui::PanModule::PanModule(SynthAudioProcessor& audioProcessor, int id)
 	sliderAttachments.add(new SliderAttachment(apvts,
 		prefix + configuration::PAN_SUFFIX + configuration::MOD_FACTOR_SUFFIX,
 		panModKnob.knob));
+	panModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 	comboBoxAttachments.add(new ComboBoxAttachment(apvts,
 		prefix + configuration::PAN_SUFFIX + configuration::MOD_CHANNEL_SUFFIX,
 		panModSrcChooser));
-	panModSrcChooser.addItemList(configuration::getModChannelNames(), 1);
 }
 
 customGui::SpectrumAnalyzerModule::SpectrumAnalyzerModule(SynthAudioProcessor& audioProcessor, int id)
@@ -493,7 +492,7 @@ customGui::SpectrumAnalyzerModule::SpectrumAnalyzerModule(SynthAudioProcessor& a
 		auto order = 11 + (int)fftOrderKnob.knob.getValue();
 		analyzer.setFFTOrder(order);
 	};
-	fftOrderKnob.knob.setValue(analyzer.getFFTOrder() - 11);
+	fftOrderKnob.knob.setValue(static_cast<double>(analyzer.getFFTOrder() - 11));
 
 	refreshRateKnob.knob.setRange(0, 3, 1);
 	refreshRateKnob.knob.onValueChange = [&]() {

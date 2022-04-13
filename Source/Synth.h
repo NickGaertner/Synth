@@ -14,6 +14,7 @@ namespace Synth
 		void prepare(const juce::dsp::ProcessSpec& spec);
 		void reset();
 	private:
+
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Synth)
 	};
 
@@ -61,6 +62,7 @@ namespace Synth
 		virtual bool appliesToChannel(int midiChannel) override;
 
 	private:
+
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthSound)
 	};
 

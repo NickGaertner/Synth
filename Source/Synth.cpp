@@ -17,8 +17,6 @@ namespace Synth {
 		}
 	}
 
-	//
-
 	void SynthVoice::prepare(const juce::dsp::ProcessSpec& spec)
 	{
 		tmpAudioBlock = juce::dsp::AudioBlock<float>(heapBlock,

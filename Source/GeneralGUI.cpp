@@ -29,6 +29,7 @@ juce::Font customGui::CustomLookAndFeel::getLabelFont(juce::Label& label) {
 
 juce::Font customGui::CustomLookAndFeel::getTextButtonFont(juce::TextButton& textButton, int buttonHeight)
 {
+	juce::ignoreUnused(textButton);
 	return {buttonHeight*0.8f};
 }
 
@@ -36,8 +37,10 @@ void customGui::CustomLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, in
 	const float rotaryStartAngle, const float rotaryEndAngle, juce::Slider& slider)
 
 {
-	auto minDim = juce::jmin(width, height);
-	auto bounds = juce::Rectangle<float>(x, y, width, height).withSizeKeepingCentre(minDim * 0.75f, minDim * 0.75f);
+	juce::ignoreUnused(slider);
+	float minDim = static_cast<float>(juce::jmin(width, height));
+	auto bounds = juce::Rectangle<float>(static_cast<float>(x), static_cast<float>(y), static_cast<float>(width), static_cast<float>(height))
+		.withSizeKeepingCentre(minDim * 0.75f, minDim * 0.75f);
 	auto radius = bounds.getWidth() / 2.f;
 	auto angle = rotaryStartAngle + sliderPos * (rotaryEndAngle - rotaryStartAngle);
 
@@ -82,8 +85,6 @@ void customGui::BypassedButton::paint(juce::Graphics& g)
 	}
 
 	roundedCornerSize *= 0.75f;
-	//jassert(4.f * roundedCornerSize + 2.f * Constants::seperatorSizePx <= getWidth());
-	//jassert(2.f * roundedCornerSize + 1.f * Constants::seperatorSizePx <= getHeight());
 
 	auto mainBounds = getLocalBounds().toFloat().withSizeKeepingCentre(getWidth() - 2.f * Constants::seperatorSizePx, roundedCornerSize * 2.f);
 	g.setColour(!getToggleState() ? Constants::enabledColour : Constants::disabledColour);
@@ -128,14 +129,7 @@ customGui::ModSrcChooser::ModSrcChooser()
 
 void customGui::ModSrcChooser::paint(juce::Graphics& g)
 {
-	float roundedCornerSize = 0.f;
-	auto* topLevelComp = getTopLevelComponent();
-	if (topLevelComp) {
-		roundedCornerSize = juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
-	}
-	else {
-		jassertfalse;
-	}
+	float roundedCornerSize = Util::getCornerSize(this);
 	auto minDim = juce::jmin(getWidth(), getHeight());
 	auto bounds = getLocalBounds().withSizeKeepingCentre(minDim, minDim).toFloat();
 
@@ -185,7 +179,7 @@ customGui::Knob::Knob(bool rotary) : Slider(
 void customGui::Knob::resized()
 {
 	Slider::resized();
-	setTextBoxStyle(getTextBoxPosition(), false, getWidth(), getHeight() / 2.f);
+	setTextBoxStyle(getTextBoxPosition(), false, getWidth(), getHeight() / 2);
 }
 
 
@@ -194,8 +188,8 @@ customGui::NamedKnob::NamedKnob(const juce::String& labelText, bool rotary)
 {
 	nameLabel.setJustificationType(juce::Justification::centred);
 	nameLabel.setColour(nameLabel.textColourId, Constants::text1Colour);
-	mainVBox.items.add(juce::FlexItem(nameLabel).withFlex(labelFlex));
-	mainVBox.items.add(juce::FlexItem(knob).withFlex(knobFlex));
+	mainVBox.items.add(juce::FlexItem(nameLabel).withFlex(LABEL_FLEX));
+	mainVBox.items.add(juce::FlexItem(knob).withFlex(KNOB_FLEX));
 
 	addAndMakeVisible(nameLabel);
 	addAndMakeVisible(knob);
@@ -217,14 +211,8 @@ customGui::MenuButton::MenuButton(const juce::String& buttonName)
 
 void customGui::MenuButton::paintButton(juce::Graphics& g, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
 {
-	float roundedCornerSize = 0.f;
-	auto* topLevelComp = getTopLevelComponent();
-	if (topLevelComp) {
-		roundedCornerSize = juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
-	}
-	else {
-		jassertfalse;
-	}
+	juce::ignoreUnused(shouldDrawButtonAsDown, shouldDrawButtonAsHighlighted);
+	float roundedCornerSize = Util::getCornerSize(this);
 
 	auto bounds = getLocalBounds().toFloat();
 	juce::Colour backgroundColour, textColour;
@@ -247,12 +235,8 @@ void customGui::MenuButton::paintButton(juce::Graphics& g, bool shouldDrawButton
 	}
 	bounds = bounds.withSizeKeepingCentre(bounds.getWidth() - Constants::seperatorSizePx,
 		bounds.getHeight() - Constants::seperatorSizePx);
-	//g.setColour(backgroundColour);
-	//g.fillRoundedRectangle(bounds, roundedCornerSize);
-	Util::draw3DRoundedRectangle(g, bounds, backgroundColour, roundedCornerSize);
 
-	//g.setColour(Constants::outlineColour);
-	//g.drawRoundedRectangle(bounds, roundedCornerSize, Constants::seperatorSizePx/1.f);
+	Util::draw3DRoundedRectangle(g, bounds, backgroundColour, roundedCornerSize);
 
 	g.setColour(textColour);
 	g.setFont(juce::Font(bounds.getHeight() * 0.55f, juce::Font::FontStyleFlags::bold));
@@ -262,7 +246,7 @@ void customGui::MenuButton::paintButton(juce::Graphics& g, bool shouldDrawButton
 customGui::HeaderMenu::HeaderMenu(SynthAudioProcessor& t_audioProcessor)
 	: audioProcessor(t_audioProcessor)
 {
-	auto horizontalMargin = SynthModule::gridMarginFactor * Constants::seperatorSizePx / 2.f;
+	auto horizontalMargin = SynthModule::GRID_MARGIN_FACTOR * Constants::seperatorSizePx / 2.f;
 	mainHBox.items.addArray({
 		juce::FlexItem(buttonGrid).withFlex(1.f)
 		.withMargin(FlexMargin(0.f,horizontalMargin,0.f,horizontalMargin)),
@@ -399,29 +383,15 @@ customGui::HeaderMenu::~HeaderMenu()
 
 void customGui::HeaderMenu::resized()
 {
-	float roundedCornerSize = 0.f;
-	auto* topLevelComp = getTopLevelComponent();
-	if (topLevelComp) {
-		roundedCornerSize = juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
-	}
-	else {
-		jassertfalse;
-	}
-	mainHBox.performLayout(getLocalBounds().withSizeKeepingCentre(
+	float roundedCornerSize = Util::getCornerSize(this);
+	mainHBox.performLayout(getLocalBounds().toFloat().withSizeKeepingCentre(
 		getWidth() - 2.f * roundedCornerSize,
 		getHeight() - 2.f * roundedCornerSize));
 }
 
 void customGui::HeaderMenu::paint(juce::Graphics& g)
 {
-	float roundedCornerSize = 0.f;
-	auto* topLevelComp = getTopLevelComponent();
-	if (topLevelComp) {
-		roundedCornerSize = juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
-	}
-	else {
-		jassertfalse;
-	}
+	float roundedCornerSize = Util::getCornerSize(this);
 	auto bounds = getLocalBounds().toFloat();
 	g.setColour(Constants::background1Colour);
 	g.fillRoundedRectangle(bounds, roundedCornerSize);
@@ -439,14 +409,7 @@ customGui::SpectrumAnalyzer::SpectrumAnalyzer(SynthAudioProcessor& t_audioProces
 
 void customGui::SpectrumAnalyzer::paint(juce::Graphics& g)
 {
-	float roundedCornerSize = 0.f;
-	auto* topLevelComp = getTopLevelComponent();
-	if (topLevelComp) {
-		roundedCornerSize = juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
-	}
-	else {
-		jassertfalse;
-	}
+	float roundedCornerSize = Util::getCornerSize(this);
 
 	g.setColour(Constants::background0Colour);
 	g.fillRoundedRectangle(getLocalBounds().toFloat(), roundedCornerSize);
@@ -501,7 +464,7 @@ void customGui::SpectrumAnalyzer::readBlock(const juce::dsp::AudioBlock<float>& 
 
 void customGui::SpectrumAnalyzer::setFFTOrder(int t_order)
 {
-	jassert(minFFTOrder <= t_order && t_order <= maxFFTOrder);
+	jassert(MIN_FFT_ORDER <= t_order && t_order <= MAX_FFT_ORDER);
 	fftOrder = t_order;
 	fftSize = 1 << fftOrder;
 	forwardFFT = juce::dsp::FFT{ fftOrder };
@@ -530,11 +493,11 @@ void customGui::SpectrumAnalyzer::drawFrame(juce::Graphics& g)
 	}
 	auto width = getLocalBounds().getWidth();
 	auto height = getLocalBounds().getHeight();
-	for (int i = 1; i < scopeSize; i++) {
+	for (int i = 1; i < SCOPE_SIZE; i++) {
 		g.drawLine({
-			(float)juce::jmap(i - 1, 0, scopeSize - 1, 0, width),
+			(float)juce::jmap(i - 1, 0, SCOPE_SIZE - 1, 0, width),
 			juce::jmap(scopeData[i - 1], 0.0f, 1.0f, (float)height, 0.0f),
-			(float)juce::jmap(i, 0, scopeSize - 1, 0, width),
+			(float)juce::jmap(i, 0, SCOPE_SIZE - 1, 0, width),
 			juce::jmap(scopeData[i], 0.0f, 1.0f, (float)height, 0.0f)
 			});
 	}
@@ -556,14 +519,14 @@ void customGui::SpectrumAnalyzer::updateSpectrum()
 		max = juce::jmax(max, fftData[i]);
 	}
 
-	for (int i = 0; i < scopeSize; i++) {
-		auto t = (float)i / (float)scopeSize;
+	for (int i = 0; i < SCOPE_SIZE; i++) {
+		auto t = (float)i / (float)SCOPE_SIZE;
 		auto exponent = (offset + t * (1.f - offset)) * halfSizeLog;
 		int fftDataIndex = static_cast<int>(std::exp2f(exponent));
 		auto level = fftData[fftDataIndex] / (max + 1);
 		level = juce::jmap(juce::Decibels::gainToDecibels(level), minDB, maxDB, 0.f, 1.f);
 
-		auto t2 = (float)(i + 0.5f) / (float)scopeSize;
+		auto t2 = (float)(i + 0.5f) / (float)SCOPE_SIZE;
 		auto exponent2 = (offset + t2 * (1.f - offset)) * halfSizeLog;
 		int fftDataIndex2 = static_cast<int>(std::exp2f(exponent2));
 		auto level2 = fftData[fftDataIndex2] / (max + 1);
@@ -578,22 +541,14 @@ customGui::LevelMeter::LevelMeter(float& valueRef) : value(valueRef) {
 }
 
 void customGui::LevelMeter::paint(juce::Graphics& g) {
-	float roundedCornerSize = 0.f;
-	auto* topLevelComp = getTopLevelComponent();
-	if (topLevelComp) {
-		roundedCornerSize = juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
-	}
-	else {
-		jassertfalse;
-	}
+	float roundedCornerSize = Util::getCornerSize(this);
 	auto bounds = getLocalBounds().toFloat();
 
 	g.setColour(Constants::background0Colour);
-	//g.fillRoundedRectangle(bounds, roundedCornerSize);
 	g.fillRect(bounds);
 
 	jassert(0.f <= value && value <= 1.f);
-	auto  quantized = juce::roundToInt(value * granularity) / granularity;
+	auto  quantized = juce::roundToInt(value * GRANULARITY) / GRANULARITY;
 	bounds = bounds.removeFromBottom(getHeight() * quantized);
 
 	g.setGradientFill(gradient);
@@ -631,7 +586,7 @@ void customGui::LevelMeter::paint(juce::Graphics& g) {
 	g.setColour(Constants::background1Colour);
 	g.fillPath(path);
 
-	auto grillLineDistance = bounds.getHeight() / (numGrillSegments);
+	auto grillLineDistance = bounds.getHeight() / (NUM_GRILL_SEGMENTS);
 	auto grillLineThickness = grillLineDistance / 3.f;
 	auto grillLinePos = bounds.getY() + grillLineDistance;
 	g.setColour(Constants::background1Colour);
@@ -650,7 +605,7 @@ void customGui::LevelMeter::resized() {
 	gradient = juce::ColourGradient{ Constants::enabledColour, localBounds.getBottomLeft(),
 									Constants::disabledColour, localBounds.getTopLeft(),
 									false };
-	gradient.addColour((numGrillSegments - 2.f) / numGrillSegments, Constants::lfoColour);
+	gradient.addColour((NUM_GRILL_SEGMENTS - 2.f) / NUM_GRILL_SEGMENTS, Constants::lfoColour);
 	gradient.addColour(0.75f, Constants::lfoColour.interpolatedWith(Constants::enabledColour, 0.5f));
 
 }
@@ -698,12 +653,12 @@ void customGui::LevelDisplay::updateLevel(float t_left, float t_right) {
 
 customGui::SynthModule::SynthModule(SynthAudioProcessor& audioProcessor, int id, int cols)
 {
-	juce::ignoreUnused(audioProcessor, id);
+	juce::ignoreUnused(audioProcessor, id, cols);
 
 	// Main Box
 	vBox.items.addArray({
-		juce::FlexItem(headerHBox).withFlex(2.f),//.withMargin(FlexMargin(Constants::seperatorSizePx)),
-		juce::FlexItem(gridComponent).withFlex(15.f).withMargin(FlexMargin(gridMarginFactor * Constants::seperatorSizePx)),
+		juce::FlexItem(headerHBox).withFlex(2.f),
+		juce::FlexItem(gridComponent).withFlex(15.f).withMargin(FlexMargin(GRID_MARGIN_FACTOR * Constants::seperatorSizePx)),
 		});
 
 	// Header
@@ -721,33 +676,26 @@ customGui::SynthModule::SynthModule(SynthAudioProcessor& audioProcessor, int id,
 	// Body
 	auto& grid = gridComponent.grid;
 	grid.autoFlow = juce::Grid::AutoFlow::row;
-	grid.autoRows = Track(knobRowFr);
+	grid.autoRows = Track(KNOB_ROW_FR);
 	grid.autoColumns = Track(Fr(1));
 	//grid.setGap(Px(2.f));
 
 	grid.templateRows = {
-		Track("knobRow0-start",knobRowFr,"knobRow0-end"),
-		Track("knobRow1-start",knobRowFr,"knobRow1-end"),
-		Track("modSrcRow-start",modSrcRowFr,"modSrcRow-end"),
+		Track("knobRow0-start",KNOB_ROW_FR,"knobRow0-end"),
+		Track("knobRow1-start",KNOB_ROW_FR,"knobRow1-end"),
+		Track("modSrcRow-start",MOD_ROW_FR,"modSrcRow-end"),
 	};
 	addAndMakeVisible(gridComponent);
 }
 
 void customGui::SynthModule::paint(juce::Graphics& g) {
 
-	float roundedCornerSize = 0.f;
-	auto* topLevelComp = getTopLevelComponent();
-	if (topLevelComp) {
-		roundedCornerSize = juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
-	}
-	else {
-		jassertfalse;
-	}
+	float roundedCornerSize = Util::getCornerSize(this);
 
 	auto gridBounds = gridComponent.getBoundsInParent().toFloat();
 	gridBounds = gridBounds.withSizeKeepingCentre(
-		gridBounds.getWidth() + gridMarginFactor * Constants::seperatorSizePx,
-		gridBounds.getHeight() + gridMarginFactor * Constants::seperatorSizePx
+		gridBounds.getWidth() + GRID_MARGIN_FACTOR * Constants::seperatorSizePx,
+		gridBounds.getHeight() + GRID_MARGIN_FACTOR * Constants::seperatorSizePx
 	);
 
 	g.setColour(Constants::background1Colour);
@@ -772,8 +720,6 @@ void customGui::SynthModule::deleteAllAttachments()
 }
 
 customGui::ModuleHolder::ModuleHolder(int cols) {
-	//grid.columnGap = Px(3); // TODO are these two needed?
-	//grid.rowGap = Px(3);
 	grid.autoFlow = juce::Grid::AutoFlow::row;
 	grid.autoRows = Track(Fr(1));
 	grid.autoColumns = Track(Fr(1));
@@ -785,38 +731,23 @@ customGui::ModuleHolder::ModuleHolder(int cols) {
 
 void customGui::ModuleHolder::addModule(SynthModule* module) {
 	modules.add(module);
-	grid.items.add(juce::GridItem(*module)); // TODO margin?
+	grid.items.add(juce::GridItem(*module));
 	addAndMakeVisible(*module);
 }
 
 void customGui::ModuleHolder::resized() {
-	float roundedCornerSize = 0.f;
-	auto* topLevelComp = getTopLevelComponent();
-	if (topLevelComp) {
-		roundedCornerSize = juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
-	}
-	else {
-		jassertfalse;
-	}
-	auto gridBounds = getLocalBounds().withSizeKeepingCentre(getWidth() - 2 * roundedCornerSize, getHeight());// -2 * roundedCornerSize);
+	float roundedCornerSize = Util::getCornerSize(this);
+	auto gridBounds = getLocalBounds().withSizeKeepingCentre(static_cast<int>(getWidth() - 2 * roundedCornerSize), getHeight());
 	grid.performLayout(gridBounds);
 }
 
 void customGui::ModuleHolder::paint(juce::Graphics& g)
 {
-	g.setColour(Constants::background0Colour);
+	float roundedCornerSize = Util::getCornerSize(this);
+	
 	auto localBounds = getLocalBounds().toFloat();
-
-	float roundedCornerSize = 0.f;
-	auto* topLevelComp = getTopLevelComponent();
-	if (topLevelComp) {
-		roundedCornerSize = juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
-	}
-	else {
-		jassertfalse;
-	}
+	g.setColour(Constants::background0Colour);
 	g.fillRoundedRectangle(localBounds, roundedCornerSize);
-
 }
 
 

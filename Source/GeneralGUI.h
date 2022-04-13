@@ -29,7 +29,6 @@ namespace customGui {
 		const juce::Colour knobMainColour = background0Colour;
 		const juce::Colour envColour = juce::Colours::aqua;
 		const juce::Colour lfoColour = juce::Colours::orange;
-
 	}
 
 	namespace Util {
@@ -91,12 +90,13 @@ namespace customGui {
 			);
 		}
 
-		inline float getCornerSize(juce::Component* component) {
+		inline float getCornerSize(const juce::Component* component) {
 			if (auto* topLevelComp = component->getTopLevelComponent()) {
 				return juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
 			}
 			else {
 				jassertfalse;
+				return 0.f;
 			}
 		}
 
@@ -214,8 +214,8 @@ namespace customGui {
 		Knob knob;
 		juce::Label nameLabel;
 
-		static inline float labelFlex = 1.f;
-		static inline float knobFlex = 2.5f;
+		static constexpr float LABEL_FLEX = 1.f;
+		static constexpr float KNOB_FLEX = 2.5f;
 	private:
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NamedKnob)
@@ -296,24 +296,24 @@ namespace customGui {
 		SynthAudioProcessor& audioProcessor;
 		bool bypassed = false;
 		int fftOrder;
-		static inline const int minFFTOrder = 11;
-		static inline const int maxFFTOrder = 15;
+		static constexpr int MIN_FFT_ORDER = 11;
+		static constexpr int MAX_FFT_ORDER = 15;
 		int fftSize;
-		static inline const int maxFFTSize = 1 << maxFFTOrder;
-		static inline const int scopeSize = 512;
+		static constexpr int MAX_FFT_SIZE = 1 << MAX_FFT_ORDER;
+		static constexpr int SCOPE_SIZE = 512;
 
 		juce::dsp::FFT forwardFFT{ 1 };
 		std::unique_ptr<juce::dsp::WindowingFunction<float>> window;
 
-		float fifo[maxFFTSize]{ 0.f };
+		float fifo[MAX_FFT_SIZE]{ 0.f };
 		int fifoBlockOffset;
 		int numBlocks = 8;
 		int fifoBlockSize;
 		int fifoLocalIndex;
 
-		float fftData[2 * maxFFTSize]{ 0.f };
+		float fftData[2 * MAX_FFT_SIZE]{ 0.f };
 		bool nextFFTBlockReady = false;
-		float scopeData[scopeSize]{ 0.f };
+		float scopeData[SCOPE_SIZE]{ 0.f };
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SpectrumAnalyzer)
 	};
@@ -332,8 +332,8 @@ namespace customGui {
 	private:
 		float& value;
 		juce::ColourGradient gradient;
-		const float granularity = 100.f;
-		const float numGrillSegments = 21.f;
+		const float GRANULARITY = 100.f;
+		const float NUM_GRILL_SEGMENTS = 21.f;
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LevelMeter)
 	};
@@ -368,7 +368,7 @@ namespace customGui {
 		virtual void paint(juce::Graphics& g) override;
 		virtual void resized() override;
 
-		inline static const float gridMarginFactor = 3.f;
+		static constexpr float GRID_MARGIN_FACTOR = 3.f;
 	protected:
 
 		// Unfortunately this needs to be called in child destructors if they use attachments
@@ -386,8 +386,8 @@ namespace customGui {
 		juce::OwnedArray<ComboBoxAttachment> comboBoxAttachments;
 		juce::OwnedArray<SliderAttachment> sliderAttachments;
 
-		const Fr knobRowFr{ 8 };
-		const Fr modSrcRowFr{ 2 };
+		const Fr KNOB_ROW_FR{ 8 };
+		const Fr MOD_ROW_FR{ 2 };
 
 	private:
 

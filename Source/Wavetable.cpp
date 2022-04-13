@@ -59,7 +59,7 @@ namespace wavetable {
 	{
 		int upperBoundExponent;
 		static_cast<void>(std::frexpf(frequency, &upperBoundExponent));
-		return getTable(upperBoundExponent-1);
+		return getTable(upperBoundExponent - 1);
 	}
 
 	const juce::String& Wavetable::getName()
@@ -79,12 +79,12 @@ namespace wavetable {
 		int maxHarmonics = getMaxHarmonics(sampleRate);
 		jassert(weights.size() == maxHarmonics);
 
-		juce::AudioBuffer<double> buffer{ maxHarmonics, defaultWtResolution };
+		juce::AudioBuffer<double> buffer{ maxHarmonics, DEFAULT_WT_RESOLUTION };
 
 		// fill buffer with weighted sine values
 		for (int i = 0; i < maxHarmonics; i++) {
-			buffer.copyFrom(i, 0, sineValues, i, 0, defaultWtResolution);
-			buffer.applyGain(i, 0, defaultWtResolution, weights[i]);
+			buffer.copyFrom(i, 0, sineValues, i, 0, DEFAULT_WT_RESOLUTION);
+			buffer.applyGain(i, 0, DEFAULT_WT_RESOLUTION, weights[i]);
 		}
 
 		// calculate the sums in place 
@@ -93,35 +93,35 @@ namespace wavetable {
 		// also normalize the values to a [-1,1] range
 		for (int i = maxHarmonics - 1; i >= 0; i--) {
 			for (auto j = i - 1; j >= 0; j--) {
-				buffer.addFrom(i, 0, buffer, j, 0, defaultWtResolution);
+				buffer.addFrom(i, 0, buffer, j, 0, DEFAULT_WT_RESOLUTION);
 			}
 			// normalize
-			buffer.applyGain(i, 0, defaultWtResolution, 1.0 / buffer.getMagnitude(i, 0, defaultWtResolution));
+			buffer.applyGain(i, 0, DEFAULT_WT_RESOLUTION, 1.0 / buffer.getMagnitude(i, 0, DEFAULT_WT_RESOLUTION));
 		}
 
 		for (int exponent = 4; exponent <= 14; exponent++) {
-			tables[exponent - 4] = juce::AudioBuffer<float>(63 + 1, defaultWtResolution + 1);
+			tables[exponent - 4] = juce::AudioBuffer<float>(DEFAULT_NUM_CHANNELS + 1, DEFAULT_WT_RESOLUTION + 1);
 			auto& wt = tables[exponent - 4];
 			// number of harmonics for upper frequency bound
-			auto orderBound = sampleRate / (2 * std::powf(2, exponent + 1));
+			auto orderBound = static_cast<float>(sampleRate) / (2.f * std::powf(2.f, exponent + 1.f));
 
-			for (int i = 0; i < 63; i++) {
+			for (int i = 0; i < DEFAULT_NUM_CHANNELS; i++) {
 				auto* channel = wt.getWritePointer(i);
 
-				auto order = (i / 62.f) * orderBound;
+				auto order = (i / (DEFAULT_NUM_CHANNELS - 1.f)) * orderBound;
 				auto order0 = static_cast<int>(std::floorf(order));
 				auto orderDelta = order - order0;
-				auto* srcChannel0 = buffer.getReadPointer(order);
-				auto* srcChannel1 = buffer.getReadPointer(order + 1); // works since we have calculated some leftover harmonics
+				auto* srcChannel0 = buffer.getReadPointer(order0);
+				auto* srcChannel1 = buffer.getReadPointer(order0 + 1); // works since we have calculated some leftover harmonics
 
-				for (int sample = 0; sample < defaultWtResolution; sample++) {
+				for (int sample = 0; sample < DEFAULT_WT_RESOLUTION; sample++) {
 					channel[sample] = (float)((1.f - orderDelta) * srcChannel0[sample] + orderDelta * srcChannel1[sample]);
 				}
 				// for wrap condition
-				channel[defaultWtResolution] = channel[0];
+				channel[DEFAULT_WT_RESOLUTION] = channel[0];
 
 				// normalize
-				wt.applyGain(i, 0, defaultWtResolution + 1, 1.0 / wt.getMagnitude(i, 0, defaultWtResolution + 1));
+				wt.applyGain(i, 0, DEFAULT_WT_RESOLUTION + 1, 1.0f / wt.getMagnitude(i, 0, DEFAULT_WT_RESOLUTION + 1));
 			}
 
 			// last channel can be left empty/uninitialized since it won't be accessed
@@ -140,11 +140,11 @@ namespace wavetable {
 			return;
 		}
 
-		sineValues = juce::AudioBuffer<double>(maxHarmonics, defaultWtResolution);
+		sineValues = juce::AudioBuffer<double>(maxHarmonics, DEFAULT_WT_RESOLUTION);
 		for (int harmonic = 0; harmonic < maxHarmonics; harmonic++) {
 			auto* channel = sineValues.getWritePointer(harmonic);
-			for (int sample = 0; sample < defaultWtResolution; sample++) {
-				channel[sample] = std::sin((harmonic + 1) * sample * juce::MathConstants<double>::twoPi / defaultWtResolution);
+			for (int sample = 0; sample < DEFAULT_WT_RESOLUTION; sample++) {
+				channel[sample] = std::sin((harmonic + 1) * sample * juce::MathConstants<double>::twoPi / DEFAULT_WT_RESOLUTION);
 			}
 		}
 	}
@@ -153,7 +153,7 @@ namespace wavetable {
 		juce::String userAppDirPath = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
 			.getFullPathName();
 
-		wtFolder = std::make_unique<juce::File>(userAppDirPath 
+		wtFolder = std::make_unique<juce::File>(userAppDirPath
 			+ juce::File::getSeparatorString() + configuration::MAIN_FOLDER_NAME
 			+ juce::File::getSeparatorString() + configuration::WT_FOLDER_NAME);
 		if (!wtFolder->isDirectory()) {
@@ -217,7 +217,7 @@ namespace wavetable {
 			case GeneratableWt::PWM:  wtPtr = new PWMWavetable(GENERATABLE_WT_NAMES[nameIndex], 44100.0); break;
 			case GeneratableWt::Trapez:  wtPtr = new TrapezWavetable(GENERATABLE_WT_NAMES[nameIndex], 44100.0); break;
 			case GeneratableWt::WhiteNoise:  wtPtr = new WhiteNoiseWavetable(GENERATABLE_WT_NAMES[nameIndex], 44100.0); break;
-			default: jassertfalse; break;
+			default: jassertfalse; return nullptr; break;
 			}
 			// write the wavetable to the file so it can be easily loaded the next time it's needed
 			juce::MemoryBlock data;
@@ -231,6 +231,7 @@ namespace wavetable {
 
 		// at this point the wt couldn't be found or generated
 		jassertfalse;
+		return nullptr;
 	}
 
 	void WavetableCache::replaceIdWithName(juce::XmlElement& xml) {
@@ -257,6 +258,14 @@ namespace wavetable {
 			}
 		}
 	}
+
+	void WavetableCache::deleteUnused() {
+		for (auto wtPtr : wavetables) {
+			if (wtPtr->getReferenceCount() == 1) {
+				wavetables.removeObject(wtPtr);
+			}
+		}
+	};
 
 	void SawHarmonicsWavetable::create(double sampleRate)
 	{
@@ -299,29 +308,29 @@ namespace wavetable {
 	{
 		updateSineValues(sampleRate);
 		auto saw = WavetableCache::getInstance()->getWavetable("SawHarmonics");
-		// TODO make 63 a constant and refactor code
+
 		for (int exponent = 4; exponent <= 14; exponent++) {
-			tables[exponent - 4] = juce::AudioBuffer<float>(63 + 1, defaultWtResolution + 1);
+			tables[exponent - 4] = juce::AudioBuffer<float>(DEFAULT_NUM_CHANNELS + 1, DEFAULT_WT_RESOLUTION + 1);
 			auto& wt = tables[exponent - 4];
 
 			// the second to last channel (62) has a saw wave with all available harmonics
-			auto sawChannel = saw->getTable(exponent).getReadPointer(62);
+			auto sawChannel = saw->getTable(exponent).getReadPointer(DEFAULT_NUM_CHANNELS-1);
 			const float delta = 2;
-			for (int i = 0; i < 63; i++) {
+			for (int i = 0; i < DEFAULT_NUM_CHANNELS; i++) {
 				auto* channel = wt.getWritePointer(i);
 				// we dont want the case wtPosition = 0 since this would result in a constant wavefunction
-				float wtPosition = (i + delta) / (62.0 + delta);
+				float wtPosition = (i + delta) / (DEFAULT_NUM_CHANNELS-1.f + delta);
 
-				for (int sample = 0; sample < defaultWtResolution; sample++) {
+				for (int sample = 0; sample < DEFAULT_WT_RESOLUTION; sample++) {
 					channel[sample] = sawChannel[sample]
-						- sawChannel[(sample + (int)(wtPosition * defaultWtResolution / 2.f)) % defaultWtResolution]
+						- sawChannel[(sample + (int)(wtPosition * DEFAULT_WT_RESOLUTION / 2.f)) % DEFAULT_WT_RESOLUTION]
 						+ (wtPosition - 1);
 				}
 				// for wrap condition
-				channel[defaultWtResolution] = channel[0];
+				channel[DEFAULT_WT_RESOLUTION] = channel[0];
 
 				// normalize
-				wt.applyGain(i, 0, defaultWtResolution + 1, 1.0 / wt.getMagnitude(i, 0, defaultWtResolution + 1));
+				wt.applyGain(i, 0, DEFAULT_WT_RESOLUTION + 1, 1.0f / wt.getMagnitude(i, 0, DEFAULT_WT_RESOLUTION + 1));
 			}
 
 			// last channel can be left empty/uninitialized since it won't be accessed
@@ -333,30 +342,29 @@ namespace wavetable {
 		updateSineValues(sampleRate);
 		auto triangle = WavetableCache::getInstance()->getWavetable("TriangleHarmonics");
 
-		// TODO make 63 a constant and refactor code
 		for (int exponent = 4; exponent <= 14; exponent++) {
-			tables[exponent - 4] = juce::AudioBuffer<float>(63 + 1, defaultWtResolution + 1);
+			tables[exponent - 4] = juce::AudioBuffer<float>(DEFAULT_NUM_CHANNELS + 1, DEFAULT_WT_RESOLUTION + 1);
 			auto& wt = tables[exponent - 4];
 
 			// the second to last channel (62) has a triangle wave with all available harmonics
-			auto triangleChannel = triangle->getTable(exponent).getReadPointer(62);
+			auto triangleChannel = triangle->getTable(exponent).getReadPointer(DEFAULT_NUM_CHANNELS-1);
 			const float delta = 1;
-			for (int i = 0; i < 63; i++) {
+			for (int i = 0; i < DEFAULT_NUM_CHANNELS; i++) {
 				auto* channel = wt.getWritePointer(i);
 				// we dont want the case wtPosition = 1 since we divide by (wtPosition - 1)
-				float wtPosition = (i) / (62.0 + delta);
+				float wtPosition = (i) / (DEFAULT_NUM_CHANNELS - 1.f + delta);
 
-				for (int sample = 0; sample < defaultWtResolution; sample++) {
+				for (int sample = 0; sample < DEFAULT_WT_RESOLUTION; sample++) {
 					jassert(1.f - wtPosition != 0.f);
 					channel[sample] = (triangleChannel[sample]
-						+ triangleChannel[(sample + (int)(wtPosition * defaultWtResolution / 2.f)) % defaultWtResolution])
+						+ triangleChannel[(sample + (int)(wtPosition * DEFAULT_WT_RESOLUTION / 2.f)) % DEFAULT_WT_RESOLUTION])
 						/ (2.f * (1.f - wtPosition));
 				}
 				// for wrap condition
-				channel[defaultWtResolution] = channel[0];
+				channel[DEFAULT_WT_RESOLUTION] = channel[0];
 
 				// normalize
-				wt.applyGain(i, 0, defaultWtResolution + 1, 1.0 / wt.getMagnitude(i, 0, defaultWtResolution + 1));
+				wt.applyGain(i, 0, DEFAULT_WT_RESOLUTION + 1, 1.0f / wt.getMagnitude(i, 0, DEFAULT_WT_RESOLUTION + 1));
 			}
 
 			// last channel can be left empty/uninitialized since it won't be accessed
@@ -365,23 +373,23 @@ namespace wavetable {
 
 	void WhiteNoiseWavetable::create(double sampleRate)
 	{
+		juce::ignoreUnused(sampleRate);
 		juce::Random random{};
-		// TODO make 63 a constant and refactor code
 		for (int exponent = 4; exponent <= 14; exponent++) {
-			tables[exponent - 4] = juce::AudioBuffer<float>(5 + 1, defaultWtResolution + 1);
+			tables[exponent - 4] = juce::AudioBuffer<float>(5 + 1, DEFAULT_WT_RESOLUTION + 1);
 			auto& wt = tables[exponent - 4];
 
 			for (int i = 0; i < 5; i++) {
 				auto* channel = wt.getWritePointer(i);
 
-				for (int sample = 0; sample < defaultWtResolution; sample++) {
+				for (int sample = 0; sample < DEFAULT_WT_RESOLUTION; sample++) {
 					channel[sample] = (random.nextFloat() * 2.f) - 1.f;
 				}
 				// for wrap condition
-				channel[defaultWtResolution] = channel[0];
+				channel[DEFAULT_WT_RESOLUTION] = channel[0];
 
 				// normalize
-				wt.applyGain(i, 0, defaultWtResolution + 1, 1.0 / wt.getMagnitude(i, 0, defaultWtResolution + 1));
+				wt.applyGain(i, 0, DEFAULT_WT_RESOLUTION + 1, 1.0f / wt.getMagnitude(i, 0, DEFAULT_WT_RESOLUTION + 1));
 			}
 
 			// last channel can be left empty/uninitialized since it won't be accessed
