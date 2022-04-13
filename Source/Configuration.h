@@ -52,8 +52,14 @@ namespace configuration {
 	extern const juce::String PARAMETER_2_SUFFIX;
 	extern const juce::String PAN_SUFFIX;
 
+	extern const juce::String VALUE_TREE_IDENTIFIER;
+
+	extern const juce::String MAIN_FOLDER_NAME;
+
 	extern const juce::String WT_FOLDER_NAME;
 	extern const juce::String WT_FILE_EXTENSION;
 	extern const int MAX_TABLES_IN_MEM;
+
+	extern const juce::String PRESET_FOLDER_NAME;
 
 }

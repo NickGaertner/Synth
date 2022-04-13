@@ -13,11 +13,15 @@ namespace customDsp {
 	};
 
 	inline static const juce::StringArray FILTER_TYPE_NAMES{
-		"NONE",
+		"None",
 		"TPT_LPF12",
 		"TPT_BPF12",
 		"TPT_HPF12",
 	};
+
+	void replaceIdWithFilterName(juce::XmlElement& xml);
+
+	void replaceFilterNameWithId(juce::XmlElement& xml);
 
 	class Filter;
 	class LadderFilter;
@@ -127,6 +131,7 @@ namespace customDsp {
 		FilterChooser() = delete;
 
 		FilterChooser(SharedData* t_data) : data(t_data) {}
+		virtual ~FilterChooser() override {};
 
 		void createFilter(FilterType type);
 
@@ -151,7 +156,7 @@ namespace customDsp {
 	public:
 		Filter() = delete;
 		Filter(FilterChooser::SharedData* t_data) : data(t_data) {}
-		virtual ~Filter() {}
+		virtual ~Filter() override{}
 
 		virtual void updateMode() = 0;
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
@@ -171,6 +176,8 @@ namespace customDsp {
 	class DummyFilter : public Filter {
 		using Filter::Filter;
 	public:
+		virtual ~DummyFilter() override {};
+
 		virtual void reset() override {}
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override { 
 			juce::ignoreUnused(context, workBuffers);
@@ -185,6 +192,8 @@ namespace customDsp {
 	class TPTFilter : public Filter {
 		using Filter::Filter;
 	public:
+		virtual ~TPTFilter() override {};
+
 		virtual void prepareUpdate() override;
 		virtual void reset() override;
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;

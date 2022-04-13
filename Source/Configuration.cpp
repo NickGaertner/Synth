@@ -24,7 +24,7 @@ namespace configuration {
 		for (auto i = 0; i < LFO_NUMBER; i++) {
 			array.add(LFO_PREFIX + juce::String(i));
 		}
-		array.add(juce::String("NONE"));
+		array.add(juce::String("None"));
 		return array;
 	}
 
@@ -64,8 +64,14 @@ namespace configuration {
 	const juce::String PARAMETER_2_SUFFIX{ "::PARAMETER_2" };
 	const juce::String PAN_SUFFIX{"::PAN"};
 
+	const juce::String VALUE_TREE_IDENTIFIER{"Parameters"};
+
+	const juce::String MAIN_FOLDER_NAME{"synth"};
+
 	const juce::String WT_FOLDER_NAME{"wavetables"};
 	const juce::String WT_FILE_EXTENSION{".wt"};
 	extern const int MAX_TABLES_IN_MEM{2};
+
+	const juce::String PRESET_FOLDER_NAME{"presets"};
 
 }

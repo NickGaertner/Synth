@@ -4,6 +4,7 @@
 #include "FX.h"
 
 customGui::MainComponent::MainComponent(SynthAudioProcessor& audioProcessor)
+	: headerMenu(audioProcessor)
 {
 	mainGrid.columnGap = Px(Constants::seperatorSizePx);
 	mainGrid.rowGap = Px(Constants::seperatorSizePx);
@@ -11,9 +12,9 @@ customGui::MainComponent::MainComponent(SynthAudioProcessor& audioProcessor)
 	mainGrid.templateRows = {
 	Track("buffer0-start", Fr(0), "buffer0-end"),
 	Track("header-row-start", Fr(1), "header-row-end"),
-	Track("modules0-row-start", Fr(6), "modules0-row-end"),
-	Track("modules1-row-start", Fr(3), "modules1.5-row-end"),
-	Track("modules1.5-row-start", Fr(3), "modules1-row-end"),
+	Track("modules0-row-start", Fr(8), "modules0-row-end"),
+	Track("modules1-row-start", Fr(4), "modules1.5-row-end"),
+	Track("modules1.5-row-start", Fr(4), "modules1-row-end"),
 	Track("buffer1-start", Fr(0), "buffer1-end"),
 	};
 
@@ -28,7 +29,7 @@ customGui::MainComponent::MainComponent(SynthAudioProcessor& audioProcessor)
 	};
 
 	mainGrid.items = {
-		juce::GridItem(header).withArea(Property("header-row-start"), Property("col0-start"),
+		juce::GridItem(headerMenu).withArea(Property("header-row-start"), Property("col0-start"),
 		Property("header-row-end"), Property("col2-end")),
 
 		juce::GridItem(oscModuleHolder).withArea(Property("modules0-row-start"), Property("col0-start"),
@@ -50,10 +51,7 @@ customGui::MainComponent::MainComponent(SynthAudioProcessor& audioProcessor)
 		Property("modules1.5-row-end"), Property("col1-end")),
 	};
 
-	// TMP
-	header.setColour(juce::Label::ColourIds::backgroundColourId, Util::createRandomColour());
-	addAndMakeVisible(header);
-	// TMP_END
+	addAndMakeVisible(headerMenu);
 
 	addAndMakeVisible(oscModuleHolder);
 	addAndMakeVisible(filterModuleHolder);
@@ -505,8 +503,9 @@ customGui::SpectrumAnalyzerModule::SpectrumAnalyzerModule(SynthAudioProcessor& a
 	refreshRateKnob.knob.setValue(std::log2(analyzer.getBlockNumber()));
 }
 
-customGui::MasterModule::MasterModule(SynthAudioProcessor& audioProcessor, int id)
-	: SynthModule(audioProcessor, id)
+customGui::MasterModule::MasterModule(SynthAudioProcessor& t_audioProcessor, int id)
+	: SynthModule(t_audioProcessor, id),
+	audioProcessor(t_audioProcessor)
 {
 	juce::String prefix{ configuration::MASTER_PREFIX };
 
@@ -528,6 +527,7 @@ customGui::MasterModule::MasterModule(SynthAudioProcessor& audioProcessor, int i
 	addAndMakeVisible(levelDisplay);
 
 	// VALUE TREE ATTACHMENTS
+	jassert(!audioProcessor.masterLevelCallback);
 	audioProcessor.masterLevelCallback = [&](float levelLeft, float levelRight) {
 		levelDisplay.updateLevel(levelLeft, levelRight);
 	};
@@ -536,3 +536,4 @@ customGui::MasterModule::MasterModule(SynthAudioProcessor& audioProcessor, int i
 
 	sliderAttachments.add(new SliderAttachment(apvts, prefix + configuration::GAIN_SUFFIX, masterKnob.knob));
 }
+

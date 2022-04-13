@@ -32,11 +32,13 @@ namespace customDsp {
 			return src_channel < configuration::ENV_NUMBER;
 		};
 
-		void addModParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& name, float modRange = 1.f) {
+		void addModParams(juce::AudioProcessorValueTreeState::ParameterLayout& layout, const juce::String& name,
+			float modRange = 1.f, float intervalValue = 0.001f)
+		{
 			layout.add(std::make_unique<juce::AudioParameterFloat>(
 				name + configuration::MOD_FACTOR_SUFFIX,
 				name + configuration::MOD_FACTOR_SUFFIX,
-				juce::NormalisableRange<float>(-1.f * modRange, 1.0f * modRange, 0.001f, 1.f),
+				juce::NormalisableRange<float>(-1.f * modRange, 1.0f * modRange, intervalValue, 1.f),
 				factor));
 			layout.add(std::make_unique<juce::AudioParameterChoice>(
 				name + configuration::MOD_CHANNEL_SUFFIX,
@@ -138,7 +140,7 @@ namespace customDsp {
 		DummyProcessor() = delete;
 
 		DummyProcessor(SharedData* t_data) : data(t_data) {}
-
+		virtual ~DummyProcessor() override {};
 
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
 			data->sampleRate = spec.sampleRate;
@@ -162,6 +164,8 @@ namespace customDsp {
 	class ProcessorChain : public Processor {
 		using Processor::Processor;
 	public:
+		virtual ~ProcessorChain() override {};
+
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
 			std::for_each(processors.begin(), processors.end(), [&](Processor* p) {p->prepare(spec); });
 		};
@@ -212,6 +216,7 @@ namespace customDsp {
 	class SplitProcessor : public ProcessorChain {
 		using ProcessorChain::ProcessorChain;
 	public:
+		virtual ~SplitProcessor() override {};
 
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
 			jassert(processors.size() < context.getOutputBlock().getNumChannels());
@@ -269,7 +274,7 @@ namespace customDsp {
 					prefix + configuration::PITCH_SUFFIX,
 					juce::NormalisableRange<float>(-24.0f, 24.0f, 0.01f, 1.f),
 					pitch));
-				modParams[PITCH].addModParams(layout, prefix + configuration::PITCH_SUFFIX, 24.f);
+				modParams[PITCH].addModParams(layout, prefix + configuration::PITCH_SUFFIX, 24.f, 0.01f);
 
 				layout.add(std::make_unique<juce::AudioParameterChoice>(
 					prefix + configuration::WT_SUFFIX,
@@ -312,6 +317,7 @@ namespace customDsp {
 		InterpolationOsc() = delete;
 
 		InterpolationOsc(SharedData* t_data) : data(t_data) {}
+		virtual ~InterpolationOsc() override {};
 
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
 			data->sampleRate = spec.sampleRate;
@@ -421,6 +427,7 @@ namespace customDsp {
 		LFO() = delete;
 
 		LFO(SharedData* t_data) : data(t_data) {}
+		virtual ~LFO() override {};
 
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
 			data->sampleRate = spec.sampleRate;
@@ -490,6 +497,7 @@ namespace customDsp {
 		Gain() = delete;
 
 		Gain(SharedData* t_data) : data(t_data) {}
+		virtual ~Gain() override {};
 
 
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
@@ -585,6 +593,7 @@ namespace customDsp {
 		Envelope() = delete;
 
 		Envelope(SharedData* t_data) : data(t_data) {}
+		virtual ~Envelope() override {};
 
 
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
@@ -664,6 +673,7 @@ namespace customDsp {
 		Pan() = delete;
 
 		Pan(SharedData* t_data) : data(t_data) {}
+		virtual ~Pan() override {};
 
 
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {

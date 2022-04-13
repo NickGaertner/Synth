@@ -168,7 +168,7 @@ void SynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer, juce::M
 		buffer.applyGain(1.f / magnitude);
 	}
 	if (masterLevelCallback) {
-		masterLevelCallback(buffer.getMagnitude(0,0,buffer.getNumSamples()), buffer.getMagnitude(1, 0, buffer.getNumSamples()));
+		masterLevelCallback(buffer.getMagnitude(0, 0, buffer.getNumSamples()), buffer.getMagnitude(1, 0, buffer.getNumSamples()));
 	}
 	if (observationCallback) {
 		observationCallback(buffer);
@@ -192,17 +192,33 @@ juce::AudioProcessorEditor* SynthAudioProcessor::createEditor()
 //==============================================================================
 void SynthAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
-	// You should use this method to store your parameters in the memory block.
-	// You could do that either as raw data, or use the XML or ValueTree classes
-	// as intermediaries to make it easy to save and load complex data.
-	juce::ignoreUnused(destData);
+	auto state = apvts.copyState();
+	std::unique_ptr<juce::XmlElement> xml{ state.createXml() };
+	wavetable::WavetableCache::getInstance()->replaceIdWithName(*xml);
+	customDsp::replaceIdWithFilterName(*xml);
+	customDsp::replaceIdWithFXName(*xml);
+
+	xml->setAttribute("PresetName", presetName);
+	copyXmlToBinary(*xml, destData);
 }
 
 void SynthAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-	// You should use this method to restore your parameters from this memory block,
-	// whose contents will have been created by the getStateInformation() call.
-	juce::ignoreUnused(data, sizeInBytes);
+	std::unique_ptr<juce::XmlElement> xmlState{ getXmlFromBinary(data, sizeInBytes) };
+	if (xmlState.get() != nullptr) {
+		if (xmlState->hasTagName(apvts.state.getType())) {
+			presetName = xmlState->getStringAttribute("PresetName","Untitled");
+			wavetable::WavetableCache::getInstance()->replaceNameWithId(*xmlState);
+			customDsp::replaceFilterNameWithId(*xmlState);
+			customDsp::replaceFXNameWithId(*xmlState);
+			apvts.replaceState(juce::ValueTree::fromXml(*xmlState));
+		}
+	}
+}
+
+void SynthAudioProcessor::panicReset()
+{
+	synth.reset();
 }
 
 void SynthAudioProcessor::initSynths()

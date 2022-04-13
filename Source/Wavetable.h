@@ -19,7 +19,7 @@ namespace wavetable {
 		using Ptr = juce::ReferenceCountedObjectPtr<Wavetable>;
 		Wavetable() = delete;
 		Wavetable(const juce::String& t_name, const juce::MemoryBlock& waveData);
-		virtual ~Wavetable() {}
+		virtual ~Wavetable() override {}
 
 		void toMemoryBlock(juce::MemoryBlock& blockToFill) const;
 
@@ -73,6 +73,10 @@ namespace wavetable {
 			return wavetableNames;
 		}
 
+		void replaceIdWithName(juce::XmlElement& xml);
+
+		void replaceNameWithId(juce::XmlElement& xml);
+
 	private:
 
 		void deleteUnused() {
@@ -116,6 +120,8 @@ namespace wavetable {
 		SawHarmonicsWavetable(const juce::String& t_name, double sampleRate) : Wavetable(t_name) {
 			create(sampleRate);
 		}
+		virtual ~SawHarmonicsWavetable() override {};
+
 		virtual void create(double sampleRate);
 
 	private:
@@ -127,6 +133,8 @@ namespace wavetable {
 		SquareHarmonicsWavetable(const juce::String& t_name, double sampleRate) : Wavetable(t_name) {
 			create(sampleRate);
 		}
+		virtual ~SquareHarmonicsWavetable() override {};
+
 		virtual void create(double sampleRate);
 
 	private:
@@ -138,6 +146,8 @@ namespace wavetable {
 		TriangleHarmonicsWavetable(const juce::String& t_name, double sampleRate) : Wavetable(t_name) {
 			create(sampleRate);
 		}
+		virtual ~TriangleHarmonicsWavetable() override {};
+
 		virtual void create(double sampleRate);
 
 	private:
@@ -150,6 +160,8 @@ namespace wavetable {
 		PWMWavetable(const juce::String& t_name, double sampleRate) : Wavetable(t_name) {
 			create(sampleRate);
 		}
+		virtual ~PWMWavetable() override {};
+
 		virtual void create(double sampleRate);
 
 	private:
@@ -162,6 +174,8 @@ namespace wavetable {
 		TrapezWavetable(const juce::String& t_name, double sampleRate) : Wavetable(t_name) {
 			create(sampleRate);
 		}
+		virtual ~TrapezWavetable() override {};
+
 		virtual void create(double sampleRate);
 
 	private:
@@ -173,6 +187,8 @@ namespace wavetable {
 		WhiteNoiseWavetable(const juce::String& t_name, double sampleRate) : Wavetable(t_name) {
 			create(sampleRate);
 		}
+		virtual ~WhiteNoiseWavetable() override {};
+
 		virtual void create(double sampleRate);
 
 	private:

@@ -1,6 +1,33 @@
 
 #include "FX.h"
 
+void customDsp::replaceIdWithFXName(juce::XmlElement& xml)
+{
+	jassert(xml.getTagName() == configuration::VALUE_TREE_IDENTIFIER);
+	for (auto* paramXml : xml.getChildIterator()) {
+		if (paramXml->getStringAttribute("id").endsWith(configuration::FX_TYPE_SUFFIX)) {
+			paramXml->setAttribute("value", FX_TYPE_NAMES[static_cast<int>(paramXml->getDoubleAttribute("value"))]);
+		}
+	}
+}
+
+void customDsp::replaceFXNameWithId(juce::XmlElement& xml)
+{
+	jassert(xml.getTagName() == configuration::VALUE_TREE_IDENTIFIER);
+	for (auto* paramXml : xml.getChildIterator()) {
+		if (paramXml->getStringAttribute("id").endsWith(configuration::FX_TYPE_SUFFIX)) {
+			auto filterName = paramXml->getStringAttribute("value");
+			auto index = FX_TYPE_NAMES.indexOf(filterName);
+			if (index != -1) {
+				paramXml->setAttribute("value", index);
+			}
+			else {
+				jassertfalse;
+			}
+		}
+	}
+}
+
 void customDsp::FXChooser::createFX(FXType type)
 {
 	switch (type) {

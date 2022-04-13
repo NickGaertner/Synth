@@ -91,6 +91,15 @@ namespace customGui {
 			);
 		}
 
+		inline float getCornerSize(juce::Component* component) {
+			if (auto* topLevelComp = component->getTopLevelComponent()) {
+				return juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
+			}
+			else {
+				jassertfalse;
+			}
+		}
+
 		inline void centerSquare(juce::Component& component) {
 			auto newBounds = component.getBounds();
 			auto centre = newBounds.getCentre();
@@ -114,15 +123,33 @@ namespace customGui {
 			g.setGradientFill(gradientOutline);
 			g.drawEllipse(bounds, Constants::seperatorSizePx);
 		}
+
+		inline void draw3DRoundedRectangle(juce::Graphics& g, const juce::Rectangle<float>& bounds, const juce::Colour& colour, float cornerSize) {
+			auto gradientFill = juce::ColourGradient(
+				colour.brighter(0.1f), bounds.getBottomRight(),
+				colour, bounds.getTopLeft(),
+				true);
+			g.setGradientFill(gradientFill);
+			g.fillRoundedRectangle(bounds, cornerSize);
+
+			auto gradientOutline = juce::ColourGradient(
+				colour.brighter(0.1f), bounds.getTopLeft(),
+				colour, bounds.getBottomRight(),
+				true);
+			g.setGradientFill(gradientOutline);
+			g.drawRoundedRectangle(bounds, cornerSize, Constants::seperatorSizePx);
+		}
 	};
 
 	class CustomLookAndFeel : public juce::LookAndFeel_V4 {
 	public:
 		CustomLookAndFeel();
-
+		virtual ~CustomLookAndFeel() override {}
 		virtual juce::Font getComboBoxFont(juce::ComboBox& comboBox) override;
 
 		virtual juce::Font getLabelFont(juce::Label& label) override;
+
+		virtual juce::Font getTextButtonFont(juce::TextButton& textButton, int buttonHeight) override;
 
 		virtual void drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height, float sliderPos,
 			const float rotaryStartAngle, const float rotaryEndAngle, juce::Slider& slider) override;
@@ -134,6 +161,8 @@ namespace customGui {
 	class BypassedButton : public  juce::ToggleButton {
 		using ToggleButton::ToggleButton;
 	public:
+		virtual ~BypassedButton() override {};
+
 		virtual void paint(juce::Graphics& g) override;
 
 	private:
@@ -142,19 +171,19 @@ namespace customGui {
 
 	class Dropdown : public juce::ComboBox {
 	public:
-		Dropdown();
-
+		Dropdown(bool t_useSeperatorLine = true);
+		virtual ~Dropdown()override {}
 		virtual void paint(juce::Graphics& g) override;
 
 	private:
-
+		bool useSeperatorLine = true;
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Dropdown)
 	};
 
-	// TODO
 	class ModSrcChooser : public juce::ComboBox {
 	public:
 		ModSrcChooser();
+		virtual ~ModSrcChooser()override {}
 		virtual void paint(juce::Graphics& g) override;
 		virtual void resized() override;
 	private:
@@ -164,16 +193,19 @@ namespace customGui {
 
 	class Knob : public juce::Slider {
 	public:
-		Knob();
+		Knob(bool rotary = true);
+		virtual ~Knob()override {}
+		virtual void resized() override;
+
 	private:
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Knob)
 	};
-	
+
 	class NamedKnob : public juce::Component {
 	public:
-		NamedKnob(const juce::String& labelText = juce::String("Name"), bool displayValue = false);
-
+		NamedKnob(const juce::String& labelText = juce::String("Name"), bool rotary = true);
+		virtual ~NamedKnob()override {}
 		virtual void setLabelText(const juce::String& t_text);
 
 		virtual void resized() override;
@@ -189,10 +221,54 @@ namespace customGui {
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(NamedKnob)
 	};
 
+	class MenuButton : public juce::Button {
+	public:
+		MenuButton(const juce::String& buttonName);
+		virtual ~MenuButton()override {}
+		virtual void paintButton(juce::Graphics& g, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown) override;
+	protected:
+
+	private:
+
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MenuButton)
+	};
+
+	class HeaderMenu : public juce::Component {
+	public:
+		HeaderMenu() = delete;
+		HeaderMenu(SynthAudioProcessor& t_audioProcessor);
+		virtual ~HeaderMenu() override;
+
+		virtual void paint(juce::Graphics& g) override;
+		virtual void resized() override;
+
+	protected:
+		juce::FlexBox mainHBox = Util::createHBox();
+		juce::FlexBox miscHBox = Util::createHBox();
+		Util::GridComponent buttonGrid;
+
+		MenuButton panicButton{ "DON'T PANIC!" };
+		juce::Label label;
+		MenuButton newButton{ "New" };
+		MenuButton openButton{ "Open" };
+		MenuButton saveButton{ "Save" };
+		MenuButton saveAsButton{ "SaveAs" };
+
+		std::unique_ptr<juce::File> presetDir;
+		std::unique_ptr<juce::FileChooser> presetFileChooser;
+		SynthAudioProcessor& audioProcessor;
+	private:
+
+		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(HeaderMenu)
+	};
+
 	class SpectrumAnalyzer : public juce::Component, private juce::Timer {
 	public:
 
 		SpectrumAnalyzer(SynthAudioProcessor& t_audioProcessor);
+		virtual ~SpectrumAnalyzer() override {
+			audioProcessor.observationCallback = nullptr;
+		}
 		virtual void paint(juce::Graphics& g) override;
 		virtual void resized() override;
 		virtual void timerCallback() override;
@@ -217,6 +293,7 @@ namespace customGui {
 
 		void updateSpectrum();
 
+		SynthAudioProcessor& audioProcessor;
 		bool bypassed = false;
 		int fftOrder;
 		static inline const int minFFTOrder = 11;
@@ -245,7 +322,7 @@ namespace customGui {
 	class LevelMeter : public juce::Component, private juce::Timer {
 	public:
 		LevelMeter(float& valueRef);
-
+		virtual ~LevelMeter() override {}
 		virtual void paint(juce::Graphics& g) override;
 
 		virtual void timerCallback() override;
@@ -261,24 +338,23 @@ namespace customGui {
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LevelMeter)
 	};
 
-	// TODO
 	class LevelDisplay : public juce::Component {
 	public:
 		LevelDisplay();
-
+		virtual ~LevelDisplay() override {}
 		void resized();
 
 		void updateLevel(float t_left, float t_right);
 
+	private:
 		juce::FlexBox vBox = Util::createVBox();
 		juce::FlexBox hBox = Util::createHBox();
 		juce::Label meterLabel{ "","Peak in dB" };
 		float levelLeft{ 0.f }, levelRight{ 0.f };
-		juce::SmoothedValue<float> smoothedLeft;
-		juce::SmoothedValue<float> smoothedRight;
+		juce::SmoothedValue<float> smoothedLeft{ 0 };
+		juce::SmoothedValue<float> smoothedRight{ 0 };
 		LevelMeter meterLeft{ levelLeft };
 		LevelMeter meterRight{ levelRight };
-	private:
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(LevelDisplay)
 	};
@@ -292,7 +368,12 @@ namespace customGui {
 		virtual void paint(juce::Graphics& g) override;
 		virtual void resized() override;
 
+		inline static const float gridMarginFactor = 3.f;
 	protected:
+
+		// Unfortunately this needs to be called in child destructors if they use attachments
+		void deleteAllAttachments();
+
 		juce::FlexBox vBox = Util::createVBox();
 		juce::FlexBox headerHBox = Util::createHBox();
 		Util::GridComponent gridComponent;
@@ -305,10 +386,9 @@ namespace customGui {
 		juce::OwnedArray<ComboBoxAttachment> comboBoxAttachments;
 		juce::OwnedArray<SliderAttachment> sliderAttachments;
 
-		const float gridMarginFactor = 3.f;
-		const Fr knobRowFr{8};
-		const Fr modSrcRowFr{2};
-		
+		const Fr knobRowFr{ 8 };
+		const Fr modSrcRowFr{ 2 };
+
 	private:
 
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(SynthModule)
@@ -317,7 +397,7 @@ namespace customGui {
 	class ModuleHolder : public juce::Component {
 	public:
 		ModuleHolder(int cols = 1);
-
+		virtual ~ModuleHolder() override {}
 		void addModule(SynthModule* module);
 
 		virtual void resized() override;

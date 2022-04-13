@@ -10,6 +10,13 @@ namespace Synth {
 		}
 	}
 
+	void Synth::reset()
+	{
+		for (auto* voice : voices) {
+			dynamic_cast<SynthVoice*>(voice)->reset();
+		}
+	}
+
 	//
 
 	void SynthVoice::prepare(const juce::dsp::ProcessSpec& spec)

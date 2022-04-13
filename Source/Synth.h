@@ -9,9 +9,10 @@ namespace Synth
 	class Synth : public juce::Synthesiser {
 		using Synthesiser::Synthesiser;
 	public:
+		virtual ~Synth() override {};
 
 		void prepare(const juce::dsp::ProcessSpec& spec);
-
+		void reset();
 	private:
 		JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Synth)
 	};
@@ -20,6 +21,7 @@ namespace Synth
 	class SynthVoice : public juce::SynthesiserVoice {
 		using SynthesiserVoice::SynthesiserVoice;
 	public:
+		virtual ~SynthVoice() override {};
 
 		void prepare(const juce::dsp::ProcessSpec& spec);
 
@@ -53,6 +55,7 @@ namespace Synth
 	class SynthSound : public juce::SynthesiserSound {
 	public:
 		SynthSound() {}
+		virtual ~SynthSound() override {};
 
 		virtual bool appliesToNote(int midiNoteNumber) override;
 		virtual bool appliesToChannel(int midiChannel) override;

@@ -10,6 +10,13 @@ customGui::CustomLookAndFeel::CustomLookAndFeel()
 	setColour(juce::PopupMenu::highlightedBackgroundColourId, Constants::background1Colour);
 	setColour(juce::PopupMenu::highlightedTextColourId, Constants::text1Colour);
 
+	// TextButton
+	setColour(juce::TextButton::ColourIds::buttonColourId, Constants::background0Colour);
+	setColour(juce::TextButton::ColourIds::buttonOnColourId, Constants::background0Colour);
+	setColour(juce::TextButton::ColourIds::textColourOffId, Constants::text0Colour);
+	setColour(juce::TextButton::ColourIds::textColourOnId, Constants::text0Colour);
+
+	setColour(juce::ComboBox::ColourIds::outlineColourId, Constants::background1Colour);
 }
 
 juce::Font customGui::CustomLookAndFeel::getComboBoxFont(juce::ComboBox& comboBox) {
@@ -18,6 +25,11 @@ juce::Font customGui::CustomLookAndFeel::getComboBoxFont(juce::ComboBox& comboBo
 
 juce::Font customGui::CustomLookAndFeel::getLabelFont(juce::Label& label) {
 	return { static_cast<float>(label.getHeight()) };
+}
+
+juce::Font customGui::CustomLookAndFeel::getTextButtonFont(juce::TextButton& textButton, int buttonHeight)
+{
+	return {buttonHeight*0.8f};
 }
 
 void customGui::CustomLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, int y, int width, int height, float sliderPos,
@@ -58,7 +70,6 @@ void customGui::CustomLookAndFeel::drawRotarySlider(juce::Graphics& g, int x, in
 	g.fillPath(indicatorPath);
 }
 
-
 void customGui::BypassedButton::paint(juce::Graphics& g)
 {
 	float roundedCornerSize = 0.f;
@@ -72,7 +83,7 @@ void customGui::BypassedButton::paint(juce::Graphics& g)
 
 	roundedCornerSize *= 0.75f;
 	//jassert(4.f * roundedCornerSize + 2.f * Constants::seperatorSizePx <= getWidth());
-	jassert(2.f * roundedCornerSize + 1.f * Constants::seperatorSizePx <= getHeight());
+	//jassert(2.f * roundedCornerSize + 1.f * Constants::seperatorSizePx <= getHeight());
 
 	auto mainBounds = getLocalBounds().toFloat().withSizeKeepingCentre(getWidth() - 2.f * Constants::seperatorSizePx, roundedCornerSize * 2.f);
 	g.setColour(!getToggleState() ? Constants::enabledColour : Constants::disabledColour);
@@ -87,7 +98,8 @@ void customGui::BypassedButton::paint(juce::Graphics& g)
 
 }
 
-customGui::Dropdown::Dropdown()
+customGui::Dropdown::Dropdown(bool t_useSeperatorLine)
+	: useSeperatorLine{ t_useSeperatorLine }
 {
 	setColour(backgroundColourId, juce::Colours::transparentBlack);
 	setColour(outlineColourId, juce::Colours::transparentBlack);
@@ -98,8 +110,10 @@ customGui::Dropdown::Dropdown()
 
 void customGui::Dropdown::paint(juce::Graphics& g)
 {
-	g.setColour(Constants::text0Colour);
-	g.fillRect(0.f, 0.f, Constants::seperatorSizePx / 2.f, static_cast<float>(getHeight()));
+	if (useSeperatorLine) {
+		g.setColour(Constants::text0Colour);
+		g.fillRect(0.f, 0.f, Constants::seperatorSizePx / 2.f, static_cast<float>(getHeight()));
+	}
 	ComboBox::paint(g);
 }
 
@@ -151,13 +165,32 @@ void customGui::ModSrcChooser::resized()
 {
 }
 
-customGui::Knob::Knob() : Slider(SliderStyle::RotaryVerticalDrag, TextEntryBoxPosition::NoTextBox)
+customGui::Knob::Knob(bool rotary) : Slider(
+	rotary ? SliderStyle::RotaryVerticalDrag : SliderStyle::IncDecButtons,
+	rotary ? TextEntryBoxPosition::NoTextBox : TextEntryBoxPosition::TextBoxAbove)
 {
+	if (rotary) {
+	}
+	else {
+		setIncDecButtonsMode(IncDecButtonMode::incDecButtonsDraggable_Vertical);
+		setNumDecimalPlacesToDisplay(2);
+		setTextBoxIsEditable(true);
+		setColour(textBoxTextColourId, Constants::text0Colour);
+		setColour(textBoxBackgroundColourId, Constants::background0Colour);
+		setColour(textBoxHighlightColourId, Constants::background1Colour);
+		setColour(textBoxOutlineColourId, Constants::background0Colour);
+	}
+}
+
+void customGui::Knob::resized()
+{
+	Slider::resized();
+	setTextBoxStyle(getTextBoxPosition(), false, getWidth(), getHeight() / 2.f);
 }
 
 
-customGui::NamedKnob::NamedKnob(const juce::String& labelText, bool displayValue)
-	: nameLabel(juce::String(), labelText)
+customGui::NamedKnob::NamedKnob(const juce::String& labelText, bool rotary)
+	: nameLabel(juce::String(), labelText), knob(rotary)
 {
 	nameLabel.setJustificationType(juce::Justification::centred);
 	nameLabel.setColour(nameLabel.textColourId, Constants::text1Colour);
@@ -177,11 +210,230 @@ void customGui::NamedKnob::resized() {
 	mainVBox.performLayout(localBounds);
 }
 
-customGui::SpectrumAnalyzer::SpectrumAnalyzer(SynthAudioProcessor& audioProcessor)
+customGui::MenuButton::MenuButton(const juce::String& buttonName)
+	: Button{ buttonName }
+{
+}
+
+void customGui::MenuButton::paintButton(juce::Graphics& g, bool shouldDrawButtonAsHighlighted, bool shouldDrawButtonAsDown)
+{
+	float roundedCornerSize = 0.f;
+	auto* topLevelComp = getTopLevelComponent();
+	if (topLevelComp) {
+		roundedCornerSize = juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
+	}
+	else {
+		jassertfalse;
+	}
+
+	auto bounds = getLocalBounds().toFloat();
+	juce::Colour backgroundColour, textColour;
+	switch (getState()) {
+	case buttonNormal:
+		backgroundColour = Constants::background0Colour;
+		textColour = Constants::text0Colour;
+		break;
+	case buttonOver:
+		backgroundColour = Constants::background1Colour;
+		textColour = Constants::text1Colour;
+		break;
+	case buttonDown:
+		backgroundColour = Constants::background1Colour.darker(0.2f);
+		textColour = Constants::text1Colour.darker(0.2f);
+		break;
+	default:
+		jassertfalse;
+		break;
+	}
+	bounds = bounds.withSizeKeepingCentre(bounds.getWidth() - Constants::seperatorSizePx,
+		bounds.getHeight() - Constants::seperatorSizePx);
+	//g.setColour(backgroundColour);
+	//g.fillRoundedRectangle(bounds, roundedCornerSize);
+	Util::draw3DRoundedRectangle(g, bounds, backgroundColour, roundedCornerSize);
+
+	//g.setColour(Constants::outlineColour);
+	//g.drawRoundedRectangle(bounds, roundedCornerSize, Constants::seperatorSizePx/1.f);
+
+	g.setColour(textColour);
+	g.setFont(juce::Font(bounds.getHeight() * 0.55f, juce::Font::FontStyleFlags::bold));
+	g.drawFittedText(getButtonText(), getLocalBounds(), juce::Justification::centred, 1);
+}
+
+customGui::HeaderMenu::HeaderMenu(SynthAudioProcessor& t_audioProcessor)
+	: audioProcessor(t_audioProcessor)
+{
+	auto horizontalMargin = SynthModule::gridMarginFactor * Constants::seperatorSizePx / 2.f;
+	mainHBox.items.addArray({
+		juce::FlexItem(buttonGrid).withFlex(1.f)
+		.withMargin(FlexMargin(0.f,horizontalMargin,0.f,horizontalMargin)),
+		juce::FlexItem(label).withFlex(1.f)
+		.withMargin(FlexMargin(0.f,horizontalMargin,0.f,horizontalMargin)),
+		juce::FlexItem(miscHBox).withFlex(1.f)
+		.withMargin(FlexMargin(0.f,horizontalMargin,0.f,horizontalMargin)),
+		});
+
+	miscHBox.items.addArray({
+		juce::FlexItem(panicButton).withFlex(1.f)
+		});
+	addAndMakeVisible(panicButton);
+
+	label.setJustificationType(juce::Justification::centred);
+	label.setColour(label.textColourId, Constants::text1Colour);
+	label.setText(audioProcessor.presetName, juce::NotificationType::sendNotification);
+	addAndMakeVisible(label);
+
+	auto& grid = buttonGrid.grid;
+	grid.autoRows = Track(Fr(1));
+	grid.autoColumns = Track(Fr(1));
+	grid.rowGap = Px(Constants::seperatorSizePx);
+	grid.columnGap = Px(3 * Constants::seperatorSizePx);
+	grid.items.addArray({
+		juce::GridItem(newButton).withArea(Property(1),Property(1)),
+		juce::GridItem(openButton).withArea(Property(),Property(2)),
+		juce::GridItem(saveButton).withArea(Property(1),Property(3)),
+		juce::GridItem(saveAsButton).withArea(Property(),Property(4)),
+		});
+
+	addAndMakeVisible(newButton);
+	addAndMakeVisible(openButton);
+	addAndMakeVisible(saveButton);
+	addAndMakeVisible(saveAsButton);
+
+	panicButton.onClick = [this]() {
+		audioProcessor.panicReset();
+	};
+
+	juce::String userAppDirPath = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
+		.getFullPathName();
+	presetDir = std::make_unique<juce::File>(userAppDirPath
+		+ juce::File::getSeparatorChar() + configuration::MAIN_FOLDER_NAME
+		+ juce::File::getSeparatorChar() + configuration::PRESET_FOLDER_NAME);
+	if (!presetDir->isDirectory()) {
+		if (presetDir->createDirectory().failed()) {
+			jassertfalse;
+		}
+	}
+
+	newButton.onClick = [this]() {
+		audioProcessor.getApvts().replaceState(juce::ValueTree(configuration::VALUE_TREE_IDENTIFIER));
+		label.setText("Untitled", juce::NotificationType::sendNotification);
+		audioProcessor.presetName = "Untitled";
+	};
+
+	openButton.onClick = [this]() {
+		presetFileChooser = std::make_unique<juce::FileChooser>("Open a preset",
+			*presetDir,
+			"*.xml");
+		auto flags = juce::FileBrowserComponent::openMode
+			| juce::FileBrowserComponent::canSelectFiles;
+
+		presetFileChooser->launchAsync(flags, [this](const juce::FileChooser& fc)
+			{
+				if (fc.getResult() == juce::File{})
+					return;
+
+				juce::MemoryBlock data;
+
+				if (fc.getResult().loadFileAsData(data)) {
+					audioProcessor.setStateInformation(data.getData(), (int)data.getSize());
+					label.setText(fc.getResult().getFileNameWithoutExtension(), juce::NotificationType::sendNotification);
+					audioProcessor.presetName = fc.getResult().getFileNameWithoutExtension();
+				}
+				else {
+					juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+						TRANS("Error whilst loading"),
+						TRANS("Couldn't read from the specified file!"));
+				}
+			});
+	};
+	saveButton.onClick = [this]() {
+		if (label.getText() == "Untitled") {
+			saveAsButton.onClick();
+			return;
+		}
+		auto file = presetDir->getChildFile(label.getText() + ".xml");
+		if (!file.existsAsFile()) {
+			saveAsButton.onClick();
+			return;
+		}
+		juce::MemoryBlock data;
+		audioProcessor.getStateInformation(data);
+		if (!file.replaceWithData(data.getData(), data.getSize())) {
+			juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+				TRANS("Error whilst saving"),
+				TRANS("Couldn't write to the specified file!"));
+		}
+
+	};
+	saveAsButton.onClick = [this]() {
+		presetFileChooser = std::make_unique<juce::FileChooser>("Save current preset",
+			*presetDir,
+			"*.xml");
+		auto flags = juce::FileBrowserComponent::saveMode
+			| juce::FileBrowserComponent::canSelectFiles
+			| juce::FileBrowserComponent::warnAboutOverwriting;
+
+		presetFileChooser->launchAsync(flags, [this](const juce::FileChooser& fc)
+			{
+				if (fc.getResult() == juce::File{})
+					return;
+
+				juce::MemoryBlock data;
+				audioProcessor.getStateInformation(data);
+				if (!fc.getResult().replaceWithData(data.getData(), data.getSize())) {
+					juce::AlertWindow::showMessageBoxAsync(juce::AlertWindow::WarningIcon,
+						TRANS("Error whilst saving"),
+						TRANS("Couldn't write to the specified file!"));
+				}
+				else {
+					label.setText(fc.getResult().getFileNameWithoutExtension(), juce::NotificationType::sendNotification);
+					audioProcessor.presetName = fc.getResult().getFileNameWithoutExtension();
+				}
+			});
+	};
+}
+
+customGui::HeaderMenu::~HeaderMenu()
+{
+}
+
+void customGui::HeaderMenu::resized()
+{
+	float roundedCornerSize = 0.f;
+	auto* topLevelComp = getTopLevelComponent();
+	if (topLevelComp) {
+		roundedCornerSize = juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
+	}
+	else {
+		jassertfalse;
+	}
+	mainHBox.performLayout(getLocalBounds().withSizeKeepingCentre(
+		getWidth() - 2.f * roundedCornerSize,
+		getHeight() - 2.f * roundedCornerSize));
+}
+
+void customGui::HeaderMenu::paint(juce::Graphics& g)
+{
+	float roundedCornerSize = 0.f;
+	auto* topLevelComp = getTopLevelComponent();
+	if (topLevelComp) {
+		roundedCornerSize = juce::jmin(topLevelComp->getWidth(), topLevelComp->getHeight()) * Constants::roundedCornerFactor;
+	}
+	else {
+		jassertfalse;
+	}
+	auto bounds = getLocalBounds().toFloat();
+	g.setColour(Constants::background1Colour);
+	g.fillRoundedRectangle(bounds, roundedCornerSize);
+}
+
+customGui::SpectrumAnalyzer::SpectrumAnalyzer(SynthAudioProcessor& t_audioProcessor)
+	:audioProcessor(t_audioProcessor)
 {
 	setFFTOrder(14);
 	setBlockNumber(8);
-	audioProcessor.observationCallback = [this](const juce::dsp::AudioBlock<float>& b) {readBlock(b); };
+	jassert(!audioProcessor.observationCallback);
+	audioProcessor.observationCallback = [&](const juce::dsp::AudioBlock<float>& b) {readBlock(b); };
 	startTimerHz(30);
 }
 
@@ -510,6 +762,13 @@ void customGui::SynthModule::resized()
 {
 	vBox.performLayout(getLocalBounds());
 
+}
+
+void customGui::SynthModule::deleteAllAttachments()
+{
+	buttonAttachments.clear();
+	comboBoxAttachments.clear();
+	sliderAttachments.clear();
 }
 
 customGui::ModuleHolder::ModuleHolder(int cols) {

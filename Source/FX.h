@@ -62,6 +62,11 @@ namespace customDsp {
 		"Distortion",
 	};
 
+
+	void replaceIdWithFXName(juce::XmlElement& xml);
+
+	void replaceFXNameWithId(juce::XmlElement& xml);
+
 	class FX;
 
 	class FXChooser : public Processor {
@@ -170,6 +175,7 @@ namespace customDsp {
 
 		FXChooser() = delete;
 		FXChooser(SharedData* t_data) : data(t_data) {}
+		virtual ~FXChooser() override {};
 
 		void createFX(FXType type);
 
@@ -193,7 +199,7 @@ namespace customDsp {
 	public:
 		FX() = delete;
 		FX(FXChooser::SharedData* t_data) : data(t_data) { mode = data->fxType; };
-		virtual ~FX() {}
+		virtual ~FX() override {}
 
 		virtual void prepare(const juce::dsp::ProcessSpec& spec) override {
 			juce::ignoreUnused(spec);
@@ -213,6 +219,8 @@ namespace customDsp {
 	class DummyFX : public FX {
 		using FX::FX;
 	public:
+		virtual ~DummyFX() override {};
+
 		virtual void reset() override {}
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override {
 			juce::ignoreUnused(context, workBuffers);
@@ -227,6 +235,8 @@ namespace customDsp {
 	class Reverb : public FX {
 		using FX::FX;
 	public:
+		virtual ~Reverb() override {};
+
 		virtual void prepareUpdate() override;
 		virtual void reset() override;
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
@@ -319,6 +329,8 @@ namespace customDsp {
 	class Delay : public FX {
 		using FX::FX;
 	public:
+		virtual ~Delay() override {};
+
 		virtual void prepareUpdate() override;
 		virtual void reset() override;
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
@@ -336,6 +348,8 @@ namespace customDsp {
 	class Flanger : public FX {
 		using FX::FX;
 	public:
+		virtual ~Flanger() override {};
+
 		virtual void prepareUpdate() override;
 		virtual void reset() override;
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
@@ -358,6 +372,8 @@ namespace customDsp {
 	class Chorus : public FX {
 		using FX::FX;
 	public:
+		virtual ~Chorus() override {};
+
 		virtual void prepareUpdate() override;
 		virtual void reset() override;
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
@@ -380,6 +396,8 @@ namespace customDsp {
 	class Phaser : public FX {
 		using FX::FX;
 	public:
+		virtual ~Phaser() override {};
+
 		virtual void prepareUpdate() override;
 		virtual void reset() override;
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
@@ -402,6 +420,8 @@ namespace customDsp {
 	class Tube : public FX {
 		using FX::FX;
 	public:
+		virtual ~Tube() override {};
+
 		virtual void reset() override;
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
 		virtual void prepareUpdate();
@@ -424,6 +444,8 @@ namespace customDsp {
 	class Distortion : public FX {
 		using FX::FX;
 	public:
+		virtual ~Distortion() override {};
+
 		virtual void reset() override;
 		virtual bool process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers) override;
 		virtual void prepareUpdate();

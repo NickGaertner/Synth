@@ -63,6 +63,10 @@ public:
 	std::function<void(const juce::dsp::AudioBlock<float>& audioBlock)> observationCallback{};
 	std::function<void(float,float)> masterLevelCallback{};
 
+	void panicReset();
+
+	juce::String presetName{ "Untitled" };
+
 private:
 
 	void initSynths();
@@ -78,7 +82,7 @@ private:
 	
 	juce::AudioProcessorValueTreeState::ParameterLayout createParameterDataAndLayout();
 
-	juce::AudioProcessorValueTreeState apvts{ *this, nullptr, "Parameters", createParameterDataAndLayout() };
+	juce::AudioProcessorValueTreeState apvts{ *this, nullptr, configuration::VALUE_TREE_IDENTIFIER, createParameterDataAndLayout() };
 
 	juce::PerformanceCounter performanceCounter{ "ProcessingBlockCounter",500 };
 	//==============================================================================

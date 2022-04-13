@@ -153,7 +153,9 @@ namespace wavetable {
 		juce::String userAppDirPath = juce::File::getSpecialLocation(juce::File::SpecialLocationType::userApplicationDataDirectory)
 			.getFullPathName();
 
-		wtFolder = std::make_unique<juce::File>(userAppDirPath + juce::File::getSeparatorString() + configuration::WT_FOLDER_NAME);
+		wtFolder = std::make_unique<juce::File>(userAppDirPath 
+			+ juce::File::getSeparatorString() + configuration::MAIN_FOLDER_NAME
+			+ juce::File::getSeparatorString() + configuration::WT_FOLDER_NAME);
 		if (!wtFolder->isDirectory()) {
 			auto result = wtFolder->createDirectory();
 			if (result.failed()) {
@@ -229,6 +231,31 @@ namespace wavetable {
 
 		// at this point the wt couldn't be found or generated
 		jassertfalse;
+	}
+
+	void WavetableCache::replaceIdWithName(juce::XmlElement& xml) {
+		jassert(xml.getTagName() == configuration::VALUE_TREE_IDENTIFIER);
+		for (auto* paramXml : xml.getChildIterator()) {
+			if (paramXml->getStringAttribute("id").endsWith(configuration::WT_SUFFIX)) {
+				paramXml->setAttribute("value", wavetableNames[static_cast<int>(paramXml->getDoubleAttribute("value"))]);
+			}
+		}
+	}
+
+	void WavetableCache::replaceNameWithId(juce::XmlElement& xml) {
+		jassert(xml.getTagName() == configuration::VALUE_TREE_IDENTIFIER);
+		for (auto* paramXml : xml.getChildIterator()) {
+			if (paramXml->getStringAttribute("id").endsWith(configuration::WT_SUFFIX)) {
+				auto wtName = paramXml->getStringAttribute("value");
+				auto index = wavetableNames.indexOf(wtName);
+				if (index != -1) {
+					paramXml->setAttribute("value", index);
+				}
+				else {
+					jassertfalse;
+				}
+			}
+		}
 	}
 
 	void SawHarmonicsWavetable::create(double sampleRate)

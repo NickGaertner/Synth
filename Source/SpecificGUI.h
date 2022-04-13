@@ -19,7 +19,7 @@ namespace customGui {
 
 		juce::Grid mainGrid = Util::createStretchGrid();
 
-		juce::Label header;
+		HeaderMenu headerMenu;
 		ModuleHolder oscModuleHolder;
 		ModuleHolder filterModuleHolder;
 		ModuleHolder fxModuleHolder;
@@ -36,8 +36,10 @@ namespace customGui {
 	public:
 		OscModule() = delete;
 		OscModule(SynthAudioProcessor& audioProcessor, int id);
-		virtual ~OscModule() override {}
-		
+		virtual ~OscModule() override {
+			deleteAllAttachments();
+		}
+
 		virtual void resized() override;
 
 	protected:
@@ -45,8 +47,8 @@ namespace customGui {
 		NamedKnob wtPosModKnob{ "Mod" };
 		ModSrcChooser wtPosModSrcChooser;
 
-		NamedKnob pitchKnob{ "Pitch" };
-		NamedKnob pitchModKnob{ "Mod" };
+		NamedKnob pitchKnob{ "Pitch" , false };
+		NamedKnob pitchModKnob{ "Mod" , false };
 		ModSrcChooser pitchModSrcChooser;
 
 		NamedKnob gainKnob{ "Gain" };
@@ -65,7 +67,9 @@ namespace customGui {
 	public:
 		FilterModule() = delete;
 		FilterModule(SynthAudioProcessor& audioProcessor, int id);
-		virtual ~FilterModule() override {}
+		virtual ~FilterModule() override {
+			deleteAllAttachments();
+		}
 
 	protected:
 		NamedKnob cutoffKnob{ "Cutoff" };
@@ -89,7 +93,9 @@ namespace customGui {
 	public:
 		FXModule() = delete;
 		FXModule(SynthAudioProcessor& audioProcessor, int id);
-		virtual ~FXModule() override {}
+		virtual ~FXModule() override {
+			deleteAllAttachments();
+		}
 
 	protected:
 		NamedKnob dryWetKnob{ "Dry-Wet" };
@@ -117,7 +123,9 @@ namespace customGui {
 	public:
 		EnvModule() = delete;
 		EnvModule(SynthAudioProcessor& audioProcessor, int id);
-		virtual ~EnvModule() override {}
+		virtual ~EnvModule() override {
+			deleteAllAttachments();
+		}
 
 	protected:
 		NamedKnob attackKnob{ "Attack" };
@@ -134,7 +142,9 @@ namespace customGui {
 	public:
 		LFOModule() = delete;
 		LFOModule(SynthAudioProcessor& audioProcessor, int id);
-		virtual ~LFOModule() override {}
+		virtual ~LFOModule() override {
+			deleteAllAttachments();
+		}
 
 	protected:
 		NamedKnob wtPosKnob{ "WtPos" };
@@ -149,7 +159,9 @@ namespace customGui {
 	public:
 		PanModule() = delete;
 		PanModule(SynthAudioProcessor& audioProcessor, int id = 0);
-		virtual ~PanModule() override {}
+		virtual ~PanModule() override {
+			deleteAllAttachments();
+		}
 
 	protected:
 		NamedKnob panKnob{ "Pan" };
@@ -166,7 +178,9 @@ namespace customGui {
 	public:
 		SpectrumAnalyzerModule() = delete;
 		SpectrumAnalyzerModule(SynthAudioProcessor& audioProcessor, int id = 0);
-		virtual ~SpectrumAnalyzerModule() override {};
+		virtual ~SpectrumAnalyzerModule() override {
+			deleteAllAttachments();
+		};
 	protected:
 		SpectrumAnalyzer analyzer;
 		NamedKnob fftOrderKnob{ "FFT Order" };
@@ -178,12 +192,15 @@ namespace customGui {
 	class MasterModule : public SynthModule {
 	public:
 		MasterModule() = delete;
-		MasterModule(SynthAudioProcessor& audioProcessor, int id = 0);
-		virtual ~MasterModule() override {}
+		MasterModule(SynthAudioProcessor& t_audioProcessor, int id = 0);
+		virtual ~MasterModule() override {
+			audioProcessor.masterLevelCallback = nullptr;
+			deleteAllAttachments();
+		}
 
 	protected:
-		LevelDisplay levelDisplay;
-
+		SynthAudioProcessor& audioProcessor;
+		LevelDisplay levelDisplay{};
 		NamedKnob masterKnob{ "Master" };
 
 	private:

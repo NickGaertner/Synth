@@ -1,6 +1,31 @@
 
 #include "Filter.h"
 
+void customDsp::replaceIdWithFilterName(juce::XmlElement& xml) {
+	jassert(xml.getTagName() == configuration::VALUE_TREE_IDENTIFIER);
+	for (auto* paramXml : xml.getChildIterator()) {
+		if (paramXml->getStringAttribute("id").endsWith(configuration::FILTER_TYPE_SUFFIX)) {
+			paramXml->setAttribute("value", FILTER_TYPE_NAMES[static_cast<int>(paramXml->getDoubleAttribute("value"))]);
+		}
+	}
+}
+
+void customDsp::replaceFilterNameWithId(juce::XmlElement& xml) {
+	jassert(xml.getTagName() == configuration::VALUE_TREE_IDENTIFIER);
+	for (auto* paramXml : xml.getChildIterator()) {
+		if (paramXml->getStringAttribute("id").endsWith(configuration::FILTER_TYPE_SUFFIX)) {
+			auto filterName = paramXml->getStringAttribute("value");
+			auto index = FILTER_TYPE_NAMES.indexOf(filterName);
+			if (index != -1) {
+				paramXml->setAttribute("value", index);
+			}
+			else {
+				jassertfalse;
+			}
+		}
+	}
+}
+
 void customDsp::FilterChooser::createFilter(FilterType type) {
 	if (type == FilterType::NONE) {
 		filter = std::make_unique<DummyFilter>(data);
@@ -137,3 +162,4 @@ bool customDsp::TPTFilter::process(juce::dsp::ProcessContextNonReplacing<float>&
 	snapToZero();
 	return isNoteOn;
 }
+
