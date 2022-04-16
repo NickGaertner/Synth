@@ -71,7 +71,7 @@ customGui::MainComponent::~MainComponent()
 
 void customGui::MainComponent::paint(juce::Graphics& g)
 {
-	g.fillAll(juce::Colours::black);
+	g.fillAll(Constants::outlineColour);
 }
 
 void customGui::MainComponent::resized()

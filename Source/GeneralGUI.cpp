@@ -1,6 +1,21 @@
 
 #include "GeneralGUI.h"
 
+namespace customGui::Constants {
+	const float roundedCornerFactor = 0.01f;
+	const float seperatorSizePx = 3.f;
+	const juce::Colour outlineColour = juce::Colour{ 0xFF151517 };
+	const juce::Colour background0Colour = juce::Colour{ 0xFF414247 };
+	const juce::Colour background1Colour = juce::Colour{ 0xFFA9ACBA };
+	const juce::Colour text0Colour = background1Colour;
+	const juce::Colour text1Colour = background0Colour;
+	const juce::Colour enabledColour = juce::Colour{ 0xFF62FA3E };
+	const juce::Colour disabledColour = juce::Colour{ 0xFFF03529 };
+	const juce::Colour knobMainColour = background0Colour;
+	const juce::Colour envColour = juce::Colour{ 0xFF41C8E0 };
+	const juce::Colour lfoColour = juce::Colour{ 0xFFEDC339 };
+}
+
 customGui::CustomLookAndFeel::CustomLookAndFeel()
 {
 	// PopupMenu

@@ -71,7 +71,6 @@ private:
 
 	void initSynths();
 
-	// TODO refactor this whole thing
 	Synth::Synth synth;
 	// first OSC_NUMBER entries hold osc specific data, 
 	// the next entry holds mono processor/filter data,

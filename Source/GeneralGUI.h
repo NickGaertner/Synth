@@ -17,18 +17,18 @@ namespace customGui {
 	using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
 
 	namespace Constants {
-		const float roundedCornerFactor = 0.01f;
-		const float seperatorSizePx = 3.f;
-		const juce::Colour outlineColour = juce::Colours::black;
-		const juce::Colour background0Colour = juce::Colours::darkgrey;
-		const juce::Colour background1Colour = juce::Colours::grey;
-		const juce::Colour text0Colour = background1Colour;
-		const juce::Colour text1Colour = background0Colour;
-		const juce::Colour enabledColour = juce::Colours::green;
-		const juce::Colour disabledColour = juce::Colours::darkred;
-		const juce::Colour knobMainColour = background0Colour;
-		const juce::Colour envColour = juce::Colours::aqua;
-		const juce::Colour lfoColour = juce::Colours::orange;
+		extern const float roundedCornerFactor;
+		extern const float seperatorSizePx;
+		extern const juce::Colour outlineColour;
+		extern const juce::Colour background0Colour;
+		extern const juce::Colour background1Colour;
+		extern const juce::Colour text0Colour;
+		extern const juce::Colour text1Colour;
+		extern const juce::Colour enabledColour;
+		extern const juce::Colour disabledColour;
+		extern const juce::Colour knobMainColour;
+		extern const juce::Colour envColour;
+		extern const juce::Colour lfoColour;
 	}
 
 	namespace Util {

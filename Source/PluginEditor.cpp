@@ -28,7 +28,7 @@ SynthAudioProcessorEditor::~SynthAudioProcessorEditor()
 //==============================================================================
 void SynthAudioProcessorEditor::paint(juce::Graphics& g)
 {
-	g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
+	g.fillAll(customGui::Constants::outlineColour);
 }
 
 void SynthAudioProcessorEditor::resized()
