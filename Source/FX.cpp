@@ -404,10 +404,10 @@ namespace customDsp {
 			auto damp = juce::jlimit(0.f, 1.f, dampBase + dampMod * dampModSrc[blockStart]);
 
 			delayInSamples[LEFT].setTargetValue(
-				juce::jmap(juce::jlimit(0.f, 1.f, timeLeftBase + timeLeftMod * timeLeftModSrc[end]),
+				juce::jmap(juce::jlimit(0.f, 1.f, timeLeftBase + timeLeftMod * timeLeftModSrc[end-1]),
 					2.f, MAX_DELAY_SEC * static_cast<float>(data->sampleRate)));
 			delayInSamples[RIGHT].setTargetValue(
-				juce::jmap(juce::jlimit(0.f, 1.f, timeRightBase + timeRightMod * timeRightModSrc[end]),
+				juce::jmap(juce::jlimit(0.f, 1.f, timeRightBase + timeRightMod * timeRightModSrc[end-1]),
 					2.f, MAX_DELAY_SEC * static_cast<float>(data->sampleRate)));
 			delayInSamples[LEFT].reset(length);
 			delayInSamples[RIGHT].reset(length);
@@ -508,10 +508,11 @@ namespace customDsp {
 
 			auto lfoValues = workBuffers.getSingleChannelBlock(0).getSubBlock(0, length);
 			auto lfoContext = juce::dsp::ProcessContextNonReplacing<float>(emptyBlock, lfoValues);
+			auto lfoWorkBuffer = workBuffers.getSingleChannelBlock(1).getSubBlock(0, length);
 
 			for (int channel = LEFT; channel <= RIGHT; channel++) {
 				lfoValues.clear();
-				lfos[channel].process(lfoContext, emptyBlock);
+				lfos[channel].process(lfoContext, lfoWorkBuffer);
 
 				delaySmoothed[channel].reset(length);
 				feedbackSmoothed[channel].reset(length);
@@ -612,10 +613,11 @@ namespace customDsp {
 
 			auto lfoValues = workBuffers.getSingleChannelBlock(0).getSubBlock(0, length);
 			auto lfoContext = juce::dsp::ProcessContextNonReplacing<float>(emptyBlock, lfoValues);
+			auto lfoWorkBuffer = workBuffers.getSingleChannelBlock(1).getSubBlock(0, length);
 
 			for (int channel = LEFT; channel <= RIGHT; channel++) {
 				lfoValues.clear();
-				lfos[channel].process(lfoContext, emptyBlock);
+				lfos[channel].process(lfoContext, lfoWorkBuffer);
 
 				centreDelaySmoothed[channel].reset(length);
 				delaySmoothed[channel].reset(length);
@@ -704,13 +706,14 @@ namespace customDsp {
 
 			auto lfoValues = workBuffers.getSingleChannelBlock(0).getSubBlock(0, length);
 			auto lfoContext = juce::dsp::ProcessContextNonReplacing<float>(emptyBlock, lfoValues);
+			auto lfoWorkBuffer = workBuffers.getSingleChannelBlock(1).getSubBlock(0, length);
 
 			// coefficients for allpass calculation
 			float G[STAGES];
 
 			for (int channel = LEFT; channel <= RIGHT; channel++) {
 				lfoValues.clear();
-				lfos[channel].process(lfoContext, emptyBlock);
+				lfos[channel].process(lfoContext, lfoWorkBuffer);
 				auto normalizedLfo = normalizedDepth * (lfoValues.getSample(0, length - 1) + 1.f) / 2.f;
 				for (int i = 0; i < STAGES; i++) {
 					auto cutoff = minCutoffs[i] * std::powf(maxCutoffs[i] / minCutoffs[i], normalizedLfo);

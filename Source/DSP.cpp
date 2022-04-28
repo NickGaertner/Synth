@@ -350,7 +350,7 @@ namespace customDsp {
 			auto end = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples());
 
 			gainSmoothed.reset(end - start);
-			gainSmoothed.setTargetValue(juce::jlimit(0.f, 1.f, baseGain + gainMod * gainModSrc[end]));
+			gainSmoothed.setTargetValue(juce::jlimit(0.f, 1.f, baseGain + gainMod * gainModSrc[end-1]));
 
 			for (int i = start; i < end; i++) {
 				workPtr[i] = gainSmoothed.getNextValue();

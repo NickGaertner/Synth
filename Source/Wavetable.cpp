@@ -117,11 +117,17 @@ namespace wavetable {
 				for (int sample = 0; sample < DEFAULT_WT_RESOLUTION; sample++) {
 					channel[sample] = (float)((1.f - orderDelta) * srcChannel0[sample] + orderDelta * srcChannel1[sample]);
 				}
-				// for wrap condition
-				channel[DEFAULT_WT_RESOLUTION] = channel[0];
 
 				// normalize
-				wt.applyGain(i, 0, DEFAULT_WT_RESOLUTION + 1, 1.0f / wt.getMagnitude(i, 0, DEFAULT_WT_RESOLUTION + 1));
+				auto mag = wt.getMagnitude(i, 0, DEFAULT_WT_RESOLUTION);
+				for (int sample = 0; sample < DEFAULT_WT_RESOLUTION; sample++) {
+					channel[sample] /= mag;
+				}
+				
+				jassert(wt.getMagnitude(i, 0, DEFAULT_WT_RESOLUTION) == 1.f);
+
+				// for wrap condition
+				channel[DEFAULT_WT_RESOLUTION] = channel[0];
 			}
 
 			// last channel can be left empty/uninitialized since it won't be accessed
@@ -145,6 +151,11 @@ namespace wavetable {
 			auto* channel = sineValues.getWritePointer(harmonic);
 			for (int sample = 0; sample < DEFAULT_WT_RESOLUTION; sample++) {
 				channel[sample] = std::sin((harmonic + 1) * sample * juce::MathConstants<double>::twoPi / DEFAULT_WT_RESOLUTION);
+			}
+			// normalize
+			auto mag = sineValues.getMagnitude(harmonic, 0, DEFAULT_WT_RESOLUTION);
+			for (int sample = 0; sample < DEFAULT_WT_RESOLUTION; sample++) {
+				channel[sample] /= mag;
 			}
 		}
 	}

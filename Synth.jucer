@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="yZ2kwu" name="Synth" projectType="audioplug" useAppConfig="0"
               addUsingNamespaceToJuceHeader="0" jucerFormatVersion="1" pluginCharacteristicsValue="pluginIsSynth,pluginWantsMidiIn"
-              cppLanguageStandard="20">
+              cppLanguageStandard="20" companyName="Nick Gaertner" pluginFormats="buildStandalone,buildVST3">
   <MAINGROUP id="LnM0Ay" name="Synth">
     <GROUP id="{DFE287B5-7806-3790-B471-A2EC5EAEEBA8}" name="Source">
       <FILE id="bP4VSH" name="Configuration.cpp" compile="1" resource="0"

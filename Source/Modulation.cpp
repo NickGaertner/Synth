@@ -193,7 +193,6 @@ namespace customDsp {
 
 	bool LFO::process(juce::dsp::ProcessContextNonReplacing<float>& context, juce::dsp::AudioBlock<float>& workBuffers)
 	{
-		juce::ignoreUnused(workBuffers);
 		auto& outputBlock = context.getOutputBlock();
 
 		float phaseStep = (juce::MathConstants<float>::twoPi * data->rate) / (float)data->sampleRate;
@@ -205,24 +204,32 @@ namespace customDsp {
 		int channelIndex = static_cast<int>(scaledWtPos);
 		auto channelDelta = scaledWtPos - channelIndex;
 
+		jassert(WORK_BUFFERS >= 1);
+		auto tmpPtr = workBuffers.getChannelPointer(0);
+
 		auto channel0 = wt.getReadPointer(channelIndex);
 		auto channel1 = wt.getReadPointer(channelIndex + 1);
 
 		for (int start = 0; start < outputBlock.getNumSamples(); start += configuration::MOD_BLOCK_SIZE) {
 			auto length = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)outputBlock.getNumSamples()) - start;
+			auto end = juce::jmin(start + configuration::MOD_BLOCK_SIZE, (int)workBuffers.getNumSamples());
 
-			auto x = phase.advance(phaseStep * length);
+			for (int i = start; i < end; i++) {
+				auto x = phase.advance(phaseStep);
 
-			auto scaledX = (x / juce::MathConstants<float>::twoPi) * (wt.getNumSamples() - 1);
-			int sampleIndex = static_cast<int>(scaledX);
-			auto xDelta = scaledX - sampleIndex;
-			auto sample0 = juce::jmap(xDelta, channel0[sampleIndex], channel0[sampleIndex + 1]);
-			auto sample1 = juce::jmap(xDelta, channel1[sampleIndex], channel1[sampleIndex + 1]);
+				auto scaledX = (x / juce::MathConstants<float>::twoPi) * (wt.getNumSamples() - 1);
+				int sampleIndex = static_cast<int>(scaledX);
+				auto xDelta = scaledX - sampleIndex;
+				auto sample0 = juce::jmap(xDelta, channel0[sampleIndex], channel0[sampleIndex + 1]);
+				auto sample1 = juce::jmap(xDelta, channel1[sampleIndex], channel1[sampleIndex + 1]);
 
-			auto sample = juce::jmap(channelDelta, sample0, sample1);
-			outputBlock.getSubBlock(start, length).add(sample);
+				auto sample = juce::jmap(channelDelta, sample0, sample1);
+				tmpPtr[i] = sample;
+			}
 		}
-
+		for (size_t channel = 0; channel < outputBlock.getNumChannels(); channel++) {
+			outputBlock.getSingleChannelBlock(channel).add(workBuffers.getSingleChannelBlock(0));
+		}
 		return isNoteOn;
 	};
 
